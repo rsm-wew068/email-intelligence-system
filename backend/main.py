@@ -16,6 +16,7 @@ from backend.models import (
     ExtractedTask,
     IngestEmailRequest,
     QuickPasteEmailRequest,
+    SendApprovedEmailRequest,
     TaskUpdateRequest,
     TaskCreateRequest,
     AgentChatRequest,
@@ -208,6 +209,78 @@ def quick_paste_email(req: QuickPasteEmailRequest) -> Dict[str, Any]:
         use_gemini=req.use_gemini,
     )
     return ingest_email(ingest_req)
+
+
+@app.post("/api/emails/send")
+def send_approved_email(req: SendApprovedEmailRequest) -> Dict[str, Any]:
+    """
+    Human-in-the-Loop approved email dispatch endpoint:
+    1. Sends via live TLS SMTP if SMTP_HOST / SMTP_USER / SMTP_PASSWORD are set in .env.
+    2. Records the sent message into the Corporate Thread Stream & Organizational Graph.
+    3. Returns a pre-addressed Gmail Compose URL for optional external browser send.
+    """
+    from urllib.parse import quote
+
+    delivery_mode = "workspace_dispatched"
+    smtp_host = os.environ.get("SMTP_HOST", "").strip()
+    smtp_user = os.environ.get("SMTP_USER", "").strip()
+    smtp_pass = os.environ.get("SMTP_PASSWORD", "").strip()
+
+    if smtp_host and smtp_user and smtp_pass:
+        import smtplib
+        from email.message import EmailMessage as PyEmailMessage
+
+        msg = PyEmailMessage()
+        msg["Subject"] = req.subject.strip()
+        msg["From"] = smtp_user
+        msg["To"] = req.to_email.strip()
+        if req.cc:
+            msg["Cc"] = ", ".join(req.cc)
+        msg.set_content(req.body.strip())
+
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        delivery_mode = "smtp_live"
+
+    new_id = f"eml-{len(state.emails) + 1:03d}"
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    sent_email = EmailMessage(
+        id=new_id,
+        thread_id=f"thr-{uuid.uuid4().hex[:6]}",
+        subject=req.subject.strip(),
+        sender_name="Sarah Chen",
+        sender_email="sarah.chen@nexusai.io",
+        recipients=[
+            {
+                "name": req.to_name.strip() or req.to_email.split("@")[0],
+                "email": req.to_email.strip().lower(),
+                "type": "to",
+            }
+        ],
+        timestamp=now_iso,
+        body=req.body.strip(),
+    )
+    extraction = state.extractor.extract(sent_email, prefer_gemini=False)
+    sent_email.extraction = extraction
+    state.emails.append(sent_email)
+
+    gmail_url = (
+        f"https://mail.google.com/mail/?view=cm&fs=1"
+        f"&to={quote(req.to_email.strip())}"
+        f"&su={quote(req.subject.strip())}"
+        f"&body={quote(req.body.strip())}"
+    )
+
+    return {
+        "status": "sent",
+        "delivery_mode": delivery_mode,
+        "email_id": sent_email.id,
+        "gmail_compose_url": gmail_url,
+        "timestamp": now_iso,
+    }
 
 
 @app.post("/api/emails/upload-eml")

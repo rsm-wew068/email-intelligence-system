@@ -10,14 +10,16 @@ from backend.models import (
     ExtractedTask,
     AgentChatResponse,
     AgentToolExecution,
+    EmailDraftAction,
 )
 from backend.extractor import EmailIntelligenceExtractor
 from backend.graph_engine import OrganizationalGraphEngine
 from backend.productivity import ProductivityScheduleManager
+from backend.sample_data import DIRECTORY_PROFILES
 
 
 AGENT_SYSTEM_INSTRUCTION = """You are the NexusAI Autonomous Email Intelligence & Productivity Agent.
-You have direct access to live tools that interact with the company's email extraction engine, organizational/relational/temporal graph database (NetworkX), and productivity task scheduler.
+You have direct access to live tools that interact with the company's email extraction engine, organizational/relational/temporal graph database (NetworkX), productivity task scheduler, and outbound email drafter.
 
 Always use your tools to inspect real state or perform actions before answering:
 1. Use `extract_email_intelligence` whenever the user provides raw email text or asks to extract/ingest an email.
@@ -25,6 +27,7 @@ Always use your tools to inspect real state or perform actions before answering:
 3. Use `list_and_filter_tasks` to inspect the structured to-do list, deliverable schedule, owner workloads, and schedule conflicts/overlaps.
 4. Use `create_or_update_task` when asked to schedule a new task, reassign an owner, change dates/priority, or update a task status (Todo, In Progress, Blocked, Completed).
 5. Use `export_schedule_to_tool` when asked to export schedules to iCalendar (.ics), CSV, or Markdown.
+6. Use `draft_follow_up_email` whenever the user asks to send an email, draft a follow-up, nudge/remind an owner, escalate a blocker, or resolve a schedule conflict via email. IMPORTANT SAFETY RULE: Never claim an email has already been sent—explain that you staged the draft below for Human-in-the-Loop review & approval.
 
 Format your final answers clearly using GitHub-flavored Markdown tables and concise bullet points grounded strictly in the tool outputs.
 """
@@ -77,6 +80,7 @@ class EmailIntelligenceAgent:
         from google.genai import types
 
         tool_calls_log: List[AgentToolExecution] = []
+        staged_drafts: List[EmailDraftAction] = []
 
         def extract_email_intelligence(
             subject: str,
@@ -293,6 +297,49 @@ class EmailIntelligenceAgent:
             )
             return payload
 
+        def draft_follow_up_email(
+            to_name: str,
+            subject: str,
+            body: str,
+            to_email: str = "",
+            related_task_id: str = "",
+        ) -> Dict[str, Any]:
+            """Stage an outbound follow-up, status check, or escalation email for Human-in-the-Loop user approval before sending."""
+            resolved_email = to_email.strip()
+            if not resolved_email:
+                for addr, prof in DIRECTORY_PROFILES.items():
+                    if prof["name"].lower() == to_name.lower() or to_name.lower() in prof["name"].lower():
+                        resolved_email = addr
+                        to_name = prof["name"]
+                        break
+            if not resolved_email:
+                slug = re.sub(r"[^a-z0-9]+", ".", to_name.lower()).strip(".")
+                resolved_email = f"{slug or 'teammate'}@nexusai.io"
+
+            draft = EmailDraftAction(
+                draft_id=f"drf-{uuid.uuid4().hex[:6]}",
+                to_name=to_name,
+                to_email=resolved_email,
+                subject=subject,
+                body=body,
+                related_task_id=related_task_id or None,
+                status="pending_approval",
+            )
+            staged_drafts.append(draft)
+            payload = {
+                "status": "staged_for_human_approval",
+                "draft": draft.model_dump(),
+            }
+            tool_calls_log.append(
+                AgentToolExecution(
+                    tool_name="draft_follow_up_email",
+                    arguments={"to_name": to_name, "to_email": resolved_email, "subject": subject},
+                    result_summary=f"Staged email draft to {to_name} <{resolved_email}> (awaiting Human-in-the-Loop approval).",
+                    data=payload,
+                )
+            )
+            return payload
+
         client = self.extractor.get_genai_client()
         candidate_models = []
         if self.extractor._resolved_live_model:
@@ -318,6 +365,7 @@ class EmailIntelligenceAgent:
                             list_and_filter_tasks,
                             create_or_update_task,
                             export_schedule_to_tool,
+                            draft_follow_up_email,
                         ],
                         temperature=0.1,
                     ),
@@ -333,9 +381,10 @@ class EmailIntelligenceAgent:
             raise RuntimeError(f"Gemini tool-calling failed across models: {last_err}")
 
         return AgentChatResponse(
-            reply=response.text or "Completed tool execution.",
-            engine=f"{self.extractor.model_name} (Native Function-Calling Agent)",
+            reply=response.text or "Staged requested action for review.",
+            engine=f"{self.extractor._resolved_live_model or self.extractor.model_name} (Native Function-Calling Agent)",
             tool_calls=tool_calls_log,
+            pending_email_drafts=staged_drafts,
             suggested_followups=self._get_followups(),
         )
 
@@ -589,6 +638,71 @@ class EmailIntelligenceAgent:
                         f"| `{t.id}` | **{t.owner}** | {t.deliverable} | {t.start_date} | **{t.due_date}** | `{t.priority}` | {t.status} |"
                     )
 
+        pending_drafts: List[EmailDraftAction] = []
+        wants_email_draft = any(
+            kw in msg_lower
+            for kw in ["send an email", "send email", "draft", "follow up", "follow-up", "remind", "nudge", "email "]
+        ) and not extracted_email_obj
+
+        if wants_email_draft:
+            target_owner = matched_owners[0] if matched_owners else None
+            if not target_owner and sched_summary["schedule_conflicts"]:
+                target_owner = sched_summary["schedule_conflicts"][0]["owner"]
+            if not target_owner and tasks:
+                target_owner = tasks[0].owner
+            target_owner = target_owner or "Marcus Vance"
+
+            owner_tasks = [t for t in tasks if t.owner == target_owner and t.status != "Completed"]
+            owner_email = next((t.owner_email for t in owner_tasks if t.owner_email), None)
+            if not owner_email:
+                for addr, prof in DIRECTORY_PROFILES.items():
+                    if prof["name"].lower() == target_owner.lower():
+                        owner_email = addr
+                        break
+            owner_email = owner_email or f"{target_owner.lower().replace(' ', '.')}@nexusai.io"
+
+            top_tasks = owner_tasks[:2]
+            task_bullets = "\n".join(
+                f"- [{t.priority}] {t.deliverable} (Due: {t.due_date}, Status: {t.status})"
+                for t in top_tasks
+            ) or "- Please share a quick status update on your upcoming sprint deliverables."
+
+            draft_subj = (
+                f"Follow-Up: {top_tasks[0].title} (Due {top_tasks[0].due_date})"
+                if top_tasks
+                else f"Quick Follow-Up on Upcoming Deliverables"
+            )
+            draft_body = (
+                f"Hi {target_owner.split()[0]},\n\n"
+                f"Checking in on your active deliverables and timeline alignment:\n"
+                f"{task_bullets}\n\n"
+                f"Please let me know if you need any blockers cleared or scope rebalanced to hit the target dates.\n\n"
+                f"Best,\nProject Operations (via NexusAI)"
+            )
+            draft_obj = EmailDraftAction(
+                draft_id=f"drf-{uuid.uuid4().hex[:6]}",
+                to_name=target_owner,
+                to_email=owner_email,
+                subject=draft_subj,
+                body=draft_body,
+                related_task_id=top_tasks[0].id if top_tasks else None,
+                status="pending_approval",
+            )
+            pending_drafts.append(draft_obj)
+            tool_calls.append(
+                AgentToolExecution(
+                    tool_name="draft_follow_up_email",
+                    arguments={"to_name": target_owner, "to_email": owner_email, "subject": draft_subj},
+                    result_summary=f"Staged outbound email draft to {target_owner} <{owner_email}> for Human-in-the-Loop approval.",
+                    data=draft_obj.model_dump(),
+                )
+            )
+            sections.append(
+                f"### ✉️ Outbound Email Staged (Human-in-the-Loop Approval Required)\n"
+                f"I prepared a grounded follow-up email to **{target_owner}** (`{owner_email}`). "
+                f"Review or edit the fields in the approval card below and click **Approve & Send** (or **Open in Gmail**)."
+            )
+
         if any(kw in msg_lower for kw in ["export", "markdown", "ics", "ical", "csv"]):
             tool_calls.append(
                 AgentToolExecution(
@@ -603,14 +717,15 @@ class EmailIntelligenceAgent:
             reply="\n\n".join(sections),
             engine=f"{self.extractor.model_name} Multi-Tool Agent",
             tool_calls=tool_calls,
+            pending_email_drafts=pending_drafts,
             suggested_followups=self._get_followups(),
         )
 
     def _get_followups(self) -> List[str]:
         return [
+            "Check who has schedule conflicts and draft a follow-up email to rebalance their tasks",
             "Who are the top organizational influencers and cross-team bridges in the graph?",
             "Show all Critical priority deliverables and detect schedule conflicts",
-            "Show Liam O'Connor's deliverable schedule and workload utilization",
             "Mark task tsk-002-01 as Completed and show updated schedule conflicts",
         ]
 

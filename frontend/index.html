@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NexusAI — Email Intelligence, Organizational Graph & Productivity Agent</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
-  <link rel="stylesheet" href="/static/styles.css?v=8.0" />
+  <link rel="stylesheet" href="/static/styles.css?v=9.0" />
 </head>
 <body>
   <!-- Top Navigation Header -->
@@ -293,6 +293,7 @@
               <div class="tool-chip"><code>query_organizational_graph</code></div>
               <div class="tool-chip"><code>list_and_filter_tasks</code></div>
               <div class="tool-chip"><code>create_or_update_task</code></div>
+              <div class="tool-chip"><code>draft_follow_up_email</code></div>
               <div class="tool-chip"><code>export_schedule_to_tool</code></div>
             </div>
           </div>
@@ -300,6 +301,10 @@
           <div class="card-section">
             <h4>One-Click Agent Playbooks</h4>
             <div class="playbook-buttons">
+              <button class="playbook-btn" onclick="sendAgentPrompt('Check who has overlapping schedule conflicts on Critical tasks and draft a follow-up email to resolve the bottleneck')">
+                <strong>&#9993; Draft Conflict Follow-Up Email (HITL)</strong>
+                <span>Stage an outbound follow-up email with Human-in-the-Loop Approve &amp; Send</span>
+              </button>
               <button class="playbook-btn" onclick="sendAgentPrompt('Who are the top organizational influencers and cross-team bridges in the graph?')">
                 <strong>Organizational Graph Analysis</strong>
                 <span>Identify key influencers, PageRank scores, and cross-team bridges</span>
@@ -449,7 +454,7 @@ Sarah Chen</textarea>
     </div>
   </div>
 
-  <script src="/static/app.js?v=8.0"></script>
+  <script src="/static/app.js?v=9.0"></script>
 </body>
 </html>
 

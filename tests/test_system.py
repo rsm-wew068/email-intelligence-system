@@ -104,6 +104,36 @@ def test_ingest_new_email_and_agent_tools():
     client.post("/api/system/reset")
 
 
+def test_hitl_email_draft_and_approved_send():
+    res_draft = client.post(
+        "/api/agent/chat",
+        json={"message": "Draft a follow-up email to Marcus Vance about his Critical deliverables"},
+    )
+    assert res_draft.status_code == 200
+    d_data = res_draft.json()
+    assert len(d_data["pending_email_drafts"]) >= 1
+    draft = d_data["pending_email_drafts"][0]
+    assert draft["status"] == "pending_approval"
+    assert "Marcus" in draft["to_name"]
+
+    res_send = client.post(
+        "/api/emails/send",
+        json={
+            "draft_id": draft["draft_id"],
+            "to_name": draft["to_name"],
+            "to_email": draft["to_email"],
+            "subject": draft["subject"],
+            "body": draft["body"],
+        },
+    )
+    assert res_send.status_code == 200
+    s_data = res_send.json()
+    assert s_data["status"] == "sent"
+    assert "mail.google.com" in s_data["gmail_compose_url"]
+
+    client.post("/api/system/reset")
+
+
 def test_verbatim_quote_grounding_and_quick_paste():
     from backend.extractor import verify_evidence_quote
 

@@ -650,7 +650,7 @@ body {
   position: relative;
   width: 100%;
   min-width: 0;
-  height: clamp(360px, 50vh, 520px);
+  height: clamp(580px, 68vh, 780px);
   background: radial-gradient(circle at center, #141d2f 0%, #0b0f19 100%);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -748,8 +748,8 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 14px;
-  max-height: calc(100vh - 195px);
-  min-height: 540px;
+  max-height: clamp(720px, 84vh, 940px);
+  min-height: 580px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1216,4 +1216,56 @@ body {
   gap: 8px;
   margin-top: 6px;
 }
+
+/* Human-in-the-Loop Outbound Email Approval Card */
+.hitl-email-card {
+  margin-top: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.hitl-email-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.hitl-field {
+  margin-bottom: 8px;
+}
+
+.hitl-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+
+.hitl-field input,
+.hitl-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-root);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+
+.hitl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
 

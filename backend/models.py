@@ -162,9 +162,31 @@ class AgentToolExecution(BaseModel):
     data: Optional[Any] = None
 
 
+class EmailDraftAction(BaseModel):
+    draft_id: str
+    to_name: str
+    to_email: str
+    cc: List[str] = Field(default_factory=list)
+    subject: str
+    body: str
+    related_task_id: Optional[str] = None
+    status: Literal["pending_approval", "sent", "rejected"] = "pending_approval"
+
+
+class SendApprovedEmailRequest(BaseModel):
+    draft_id: Optional[str] = None
+    to_name: str
+    to_email: str
+    cc: List[str] = Field(default_factory=list)
+    subject: str
+    body: str
+    related_task_id: Optional[str] = None
+
+
 class AgentChatResponse(BaseModel):
     reply: str
     engine: str
     tool_calls: List[AgentToolExecution] = Field(default_factory=list)
+    pending_email_drafts: List[EmailDraftAction] = Field(default_factory=list)
     suggested_followups: List[str] = Field(default_factory=list)
 

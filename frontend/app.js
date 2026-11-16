@@ -1109,7 +1109,10 @@ function renderTasksHub() {
             </select>
           </td>
           <td>
-            <button class="btn btn-xs btn-outline" onclick="jumpToSourceEmail('${t.source_email_id}')" title="Inspect source email">${t.source_email_id} &rarr;</button>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <button class="btn btn-xs btn-secondary" onclick="draftFollowUpForTask('${t.id}')" title="Draft follow-up email via AI Agent">&#9993; Follow Up</button>
+              <button class="btn btn-xs btn-outline" onclick="jumpToSourceEmail('${t.source_email_id}')" title="Inspect source email">${t.source_email_id} &rarr;</button>
+            </div>
           </td>
         </tr>
       `;
@@ -1283,6 +1286,49 @@ async function sendAgentPrompt(promptText) {
       )
       .join("");
 
+    const draftsHtml = (res.pending_email_drafts || [])
+      .map(
+        (d) => `
+        <div class="hitl-email-card" id="hitl-card-${escapeHtml(d.draft_id)}">
+          <div class="hitl-email-header">
+            <div style="font-weight:700;color:#e2e8f0;">
+              &#9993; Outbound Email Action — Human-in-the-Loop Approval Required
+            </div>
+            <span class="badge badge-amber" id="hitl-badge-${escapeHtml(d.draft_id)}">Pending Approval</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="hitl-field">
+              <label>Recipient Name</label>
+              <input type="text" id="hitl-name-${escapeHtml(d.draft_id)}" value="${escapeHtml(d.to_name)}" />
+            </div>
+            <div class="hitl-field">
+              <label>Recipient Email</label>
+              <input type="email" id="hitl-to-${escapeHtml(d.draft_id)}" value="${escapeHtml(d.to_email)}" />
+            </div>
+          </div>
+          <div class="hitl-field">
+            <label>Subject</label>
+            <input type="text" id="hitl-subj-${escapeHtml(d.draft_id)}" value="${escapeHtml(d.subject)}" />
+          </div>
+          <div class="hitl-field">
+            <label>Email Body (Editable before sending)</label>
+            <textarea rows="5" id="hitl-body-${escapeHtml(d.draft_id)}">${escapeHtml(d.body)}</textarea>
+          </div>
+          <div class="hitl-actions" id="hitl-actions-${escapeHtml(d.draft_id)}">
+            <button type="button" class="btn btn-xs btn-primary" onclick="approveAndSendDraft('${escapeHtml(d.draft_id)}')">
+              &#10003; Approve &amp; Send
+            </button>
+            <button type="button" class="btn btn-xs btn-secondary" onclick="openDraftInGmail('${escapeHtml(d.draft_id)}')">
+              &#8599; Open in Gmail Compose
+            </button>
+            <button type="button" class="btn btn-xs btn-outline" onclick="rejectEmailDraft('${escapeHtml(d.draft_id)}')">
+              &#10005; Reject Action
+            </button>
+          </div>
+        </div>`
+      )
+      .join("");
+
     chatBox.insertAdjacentHTML(
       "beforeend",
       `<div class="chat-msg agent">
@@ -1292,6 +1338,7 @@ async function sendAgentPrompt(promptText) {
         </div>
         ${toolsHtml}
         <div class="msg-body">${renderMarkdownToHtml(res.reply)}</div>
+        ${draftsHtml}
       </div>`
     );
     chatBox.scrollTop = chatBox.scrollHeight;
@@ -1312,6 +1359,68 @@ async function sendAgentPrompt(promptText) {
     btn.disabled = false;
     btn.textContent = "Run Agent";
   }
+}
+
+function draftFollowUpForTask(taskId) {
+  const all = (appState.tasksData && appState.tasksData.tasks) || [];
+  const t = all.find((x) => x.id === taskId);
+  if (!t) return;
+  const prompt = `Draft a concise follow-up email to ${t.owner} (${t.owner_email || ""}) checking in on task ${t.id}: "${t.deliverable}" due ${t.due_date} (${t.priority} priority).`;
+  sendAgentPrompt(prompt);
+}
+
+async function approveAndSendDraft(draftId) {
+  const toName = document.getElementById(`hitl-name-${draftId}`).value.trim();
+  const toEmail = document.getElementById(`hitl-to-${draftId}`).value.trim();
+  const subject = document.getElementById(`hitl-subj-${draftId}`).value.trim();
+  const body = document.getElementById(`hitl-body-${draftId}`).value.trim();
+  const actionsEl = document.getElementById(`hitl-actions-${draftId}`);
+  const badgeEl = document.getElementById(`hitl-badge-${draftId}`);
+
+  actionsEl.innerHTML = `<span class="muted-sm">Dispatching approved email...</span>`;
+  const res = await fetch("/api/emails/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      draft_id: draftId,
+      to_name: toName,
+      to_email: toEmail,
+      subject,
+      body,
+    }),
+  }).then((r) => r.json());
+
+  badgeEl.className = "badge badge-emerald";
+  badgeEl.textContent =
+    res.delivery_mode === "smtp_live"
+      ? "Sent via SMTP + Logged to Graph ✓"
+      : `Approved & Logged (${res.email_id}) ✓`;
+
+  actionsEl.innerHTML = `
+    <span style="font-size:12px;color:#6ee7b7;font-weight:600;">&#10003; Dispatched to thread stream &amp; organizational graph (${escapeHtml(res.email_id)})</span>
+    <a class="btn btn-xs btn-outline" href="${escapeHtml(res.gmail_compose_url)}" target="_blank" rel="noopener">&#8599; Also Send via Gmail</a>
+  `;
+  await refreshAllData();
+}
+
+function openDraftInGmail(draftId) {
+  const toEmail = document.getElementById(`hitl-to-${draftId}`).value.trim();
+  const subject = document.getElementById(`hitl-subj-${draftId}`).value.trim();
+  const body = document.getElementById(`hitl-body-${draftId}`).value.trim();
+  const gmailUrl =
+    `https://mail.google.com/mail/?view=cm&fs=1` +
+    `&to=${encodeURIComponent(toEmail)}` +
+    `&su=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+  window.open(gmailUrl, "_blank", "noopener");
+}
+
+function rejectEmailDraft(draftId) {
+  const badgeEl = document.getElementById(`hitl-badge-${draftId}`);
+  const actionsEl = document.getElementById(`hitl-actions-${draftId}`);
+  badgeEl.className = "badge badge-rose";
+  badgeEl.textContent = "Rejected";
+  actionsEl.innerHTML = `<span class="muted-sm">Outbound email action canceled by user.</span>`;
 }
 
 // Modals & Ingestion
