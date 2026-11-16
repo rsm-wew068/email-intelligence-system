@@ -1,17 +1,75 @@
 from __future__ import annotations
 import csv
 import io
-from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+import re
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Any, Optional, Tuple, Set
 from collections import defaultdict
 
 from backend.models import ExtractedTask
+
+TASK_STOPWORDS = {
+    "the", "and", "for", "with", "from", "into", "that", "this", "over", "all",
+    "please", "complete", "deliver", "prepare", "send", "finalize", "update",
+    "updated", "ensure", "across", "between", "starting", "due", "priority",
+}
+
+
+def _task_tokens(text: str) -> Set[str]:
+    words = re.findall(r"[a-z0-9]{3,}", (text or "").lower())
+    out: Set[str] = set()
+    for w in words:
+        if w in TASK_STOPWORDS or re.match(r"^202\d$", w):
+            continue
+        for suf in ("ing", "tion", "ions", "ed", "es", "s"):
+            if len(w) > len(suf) + 3 and w.endswith(suf):
+                w = w[: -len(suf)]
+                break
+        out.add(w)
+    return out
+
+
+def compute_task_similarity(task_a: ExtractedTask, task_b: ExtractedTask) -> float:
+    toks_a = _task_tokens(f"{task_a.title} {task_a.deliverable}")
+    toks_b = _task_tokens(f"{task_b.title} {task_b.deliverable}")
+    if not toks_a or not toks_b:
+        return 0.0
+    inter = len(toks_a & toks_b)
+    dice = (2.0 * inter) / (len(toks_a) + len(toks_b))
+    min_cov = inter / min(len(toks_a), len(toks_b))
+    return round(max(dice, 0.85 * min_cov), 3)
+
+
+def find_best_duplicate_match(
+    candidate: ExtractedTask,
+    existing_tasks: List[ExtractedTask],
+) -> Optional[Tuple[ExtractedTask, float]]:
+    best_match: Optional[ExtractedTask] = None
+    best_sim = 0.0
+    cand_owner = (candidate.owner or "").lower().strip()
+
+    for ex in existing_tasks:
+        if ex.status == "Completed" or ex.id == candidate.id:
+            continue
+        sim = compute_task_similarity(candidate, ex)
+        same_owner = cand_owner and (
+            cand_owner == (ex.owner or "").lower().strip()
+            or cand_owner.split()[0] == (ex.owner or "_").lower().split()[0]
+        )
+        threshold = 0.55 if same_owner else 0.72
+        if sim >= threshold and sim > best_sim:
+            best_sim = sim
+            best_match = ex
+
+    if best_match is not None:
+        return best_match, best_sim
+    return None
 
 
 class ProductivityScheduleManager:
     """
     Converts extracted email tasks into structured schedules, detects workload bottlenecks,
-    and exports to iCalendar (.ics), CSV, JSON, and Markdown formats.
+    proposes Human-in-the-Loop conflict resolutions, and exports to iCalendar (.ics), CSV, and Markdown.
     """
 
     def build_schedule_summary(self, tasks: List[ExtractedTask], reference_date: str = "2026-11-01") -> Dict[str, Any]:
@@ -26,7 +84,7 @@ class ProductivityScheduleManager:
             by_priority[t.priority] = by_priority.get(t.priority, 0) + 1
 
         owner_workloads = []
-        schedule_conflicts = []
+        raw_overlaps = []
         for owner, owner_tasks in by_owner.items():
             active_tasks = [t for t in owner_tasks if t["status"] != "Completed"]
             total_hours = sum(t.get("estimated_hours", 4.0) for t in active_tasks)
@@ -37,15 +95,7 @@ class ProductivityScheduleManager:
                     t1, t2 = active_tasks[i], active_tasks[j]
                     if t1["start_date"] <= t2["due_date"] and t2["start_date"] <= t1["due_date"]:
                         if t1["priority"] in ("Critical", "High") and t2["priority"] in ("Critical", "High"):
-                            schedule_conflicts.append(
-                                {
-                                    "owner": owner,
-                                    "task_a": t1["title"],
-                                    "task_b": t2["title"],
-                                    "overlap_window": f"{max(t1['start_date'], t2['start_date'])} to {min(t1['due_date'], t2['due_date'])}",
-                                    "severity": "High" if "Critical" in (t1["priority"], t2["priority"]) else "Medium",
-                                }
-                            )
+                            raw_overlaps.append((owner, t1, t2))
 
             owner_workloads.append(
                 {
@@ -64,6 +114,58 @@ class ProductivityScheduleManager:
             )
 
         owner_workloads.sort(key=lambda x: (x["estimated_active_hours"], x["total_tasks"]), reverse=True)
+        least_loaded_candidates = sorted(owner_workloads, key=lambda x: (x["estimated_active_hours"], x["critical_tasks"]))
+
+        schedule_conflicts = []
+        for owner, t1, t2 in raw_overlaps:
+            # Anchor the Critical/earlier task and propose shifting or reassigning the secondary task
+            anchor, movable = (t2, t1) if (t2["priority"] == "Critical" and t1["priority"] != "Critical") else (t1, t2)
+            try:
+                dt_anchor_due = datetime.strptime(anchor["due_date"][:10], "%Y-%m-%d")
+                dt_mov_start = datetime.strptime(movable["start_date"][:10], "%Y-%m-%d")
+                dt_mov_due = datetime.strptime(movable["due_date"][:10], "%Y-%m-%d")
+                dur_days = max(2, (dt_mov_due - dt_mov_start).days)
+                new_start_dt = dt_anchor_due + timedelta(days=1)
+                new_due_dt = new_start_dt + timedelta(days=dur_days)
+                new_start = new_start_dt.strftime("%Y-%m-%d")
+                new_due = new_due_dt.strftime("%Y-%m-%d")
+            except Exception:
+                new_start = anchor["due_date"]
+                new_due = movable["due_date"]
+
+            alt_owner_entry = next(
+                (w for w in least_loaded_candidates if w["owner"] != owner),
+                None,
+            )
+
+            schedule_conflicts.append(
+                {
+                    "owner": owner,
+                    "task_a": t1["title"],
+                    "task_a_id": t1["id"],
+                    "task_b": t2["title"],
+                    "task_b_id": t2["id"],
+                    "overlap_window": f"{max(t1['start_date'], t2['start_date'])} to {min(t1['due_date'], t2['due_date'])}",
+                    "severity": "High" if "Critical" in (t1["priority"], t2["priority"]) else "Medium",
+                    "shift_proposal": {
+                        "task_id": movable["id"],
+                        "task_title": movable["title"],
+                        "new_start_date": new_start,
+                        "new_due_date": new_due,
+                    },
+                    "reassign_proposal": (
+                        {
+                            "task_id": movable["id"],
+                            "task_title": movable["title"],
+                            "new_owner": alt_owner_entry["owner"],
+                            "new_owner_email": alt_owner_entry.get("owner_email") or "",
+                            "active_hours": alt_owner_entry["estimated_active_hours"],
+                        }
+                        if alt_owner_entry
+                        else None
+                    ),
+                }
+            )
 
         return {
             "total_tasks": len(tasks),

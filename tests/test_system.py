@@ -176,3 +176,61 @@ def test_verbatim_quote_grounding_and_quick_paste():
 
     client.post("/api/system/reset")
 
+
+def test_hitl_duplicate_merge_and_conflict_proposals():
+    # 1. Verify schedule_conflicts expose Human-in-the-Loop shift & reassign proposals
+    res_before = client.get("/api/tasks")
+    assert res_before.status_code == 200
+    before_data = res_before.json()
+    initial_count = before_data["count"]
+    conflicts = before_data["schedule_summary"]["schedule_conflicts"]
+    assert len(conflicts) >= 1
+    first_conflict = conflicts[0]
+    assert "shift_proposal" in first_conflict
+    assert "reassign_proposal" in first_conflict
+    assert first_conflict["shift_proposal"]["task_id"]
+
+    # 2. Ingest a follow-up email with a near-duplicate deliverable for Liam O'Connor
+    dup_raw = (
+        "From: Marcus Vance <marcus.vance@nexusai.io>\n"
+        "To: Liam O'Connor <liam.oconnor@nexusai.io>\n"
+        "Date: 2026-11-01\n"
+        "Subject: Re: Terraform GPU Node Pools — Deadline Extension\n\n"
+        "Hi Liam,\n"
+        "1. Liam O'Connor: Provision Terraform GPU node pools and Redis cluster in us-east-1 and eu-central-1 with FinOps cost-allocation tags starting 2026-10-26, due by 2026-11-06 (Critical Priority).\n"
+        "Thanks,\nMarcus Vance"
+    )
+    res_ing = client.post(
+        "/api/emails/quick-paste",
+        json={"raw_text": dup_raw, "use_gemini": False},
+    )
+    assert res_ing.status_code == 200
+    ing_data = res_ing.json()
+    assert ing_data["duplicates_flagged"] >= 1
+    assert ing_data["tasks_added"] == 0
+
+    # 3. Verify candidate sits in pending_duplicates (NOT auto-merged) until human approves
+    res_mid = client.get("/api/tasks")
+    mid_data = res_mid.json()
+    assert mid_data["count"] == initial_count
+    assert len(mid_data["pending_duplicates"]) >= 1
+    prop = mid_data["pending_duplicates"][0]
+    assert prop["similarity"] >= 0.42
+
+    # 4. Human explicitly approves merge -> existing task updated, task count stays identical
+    res_merge = client.post(
+        f"/api/duplicates/{prop['proposal_id']}/resolve",
+        json={"action": "merge"},
+    )
+    assert res_merge.status_code == 200
+    merge_data = res_merge.json()
+    assert merge_data["status"] == "merged"
+    assert merge_data["updated_task"]["due_date"] == "2026-11-06"
+    assert merge_data["remaining_duplicates"] == 0
+
+    res_after = client.get("/api/tasks")
+    assert res_after.json()["count"] == initial_count
+
+    client.post("/api/system/reset")
+
+

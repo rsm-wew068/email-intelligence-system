@@ -110,6 +110,13 @@ function renderKpiRibbon() {
   setTxt("kpi-edges", `${m.graph_edges} relational & temporal edges`);
   setTxt("kpi-conflicts", m.schedule_conflicts);
 
+  const pendingDups = (appState.tasksData && appState.tasksData.pending_duplicates) || [];
+  const dupBtn = document.getElementById("strip-dup-btn");
+  if (dupBtn) {
+    dupBtn.style.display = pendingDups.length > 0 ? "inline-flex" : "none";
+    setTxt("kpi-duplicates", pendingDups.length);
+  }
+
   const dot = document.getElementById("gemini-dot");
   const label = document.getElementById("gemini-status-label");
   if (dot && label) {
@@ -172,6 +179,42 @@ async function reExtractCurrentEmail(emailId) {
     method: "POST",
   });
   await refreshAllData();
+}
+
+function highlightGroundedQuotes(rawBody, tasks) {
+  if (!rawBody) return "";
+  const verifiedQuotes = (tasks || [])
+    .filter((t) => t.quote_verified && t.evidence_quote && t.evidence_quote.trim().length >= 8)
+    .map((t) => ({ quote: t.evidence_quote.trim(), owner: t.owner || "Owner" }));
+
+  if (verifiedQuotes.length === 0) return escapeHtml(rawBody);
+
+  // Find non-overlapping character spans in rawBody (case-insensitive)
+  const lowerBody = rawBody.toLowerCase();
+  const spans = [];
+  for (const item of verifiedQuotes) {
+    const qLower = item.quote.toLowerCase();
+    const idx = lowerBody.indexOf(qLower);
+    if (idx !== -1) {
+      const end = idx + item.quote.length;
+      const overlaps = spans.some((s) => idx < s.end && end > s.start);
+      if (!overlaps) {
+        spans.push({ start: idx, end, owner: item.owner });
+      }
+    }
+  }
+  if (spans.length === 0) return escapeHtml(rawBody);
+  spans.sort((a, b) => a.start - b.start);
+
+  let out = "";
+  let cursor = 0;
+  for (const sp of spans) {
+    out += escapeHtml(rawBody.slice(cursor, sp.start));
+    out += `<mark class="grounded-span" title="Verbatim Grounded Action Item (${escapeHtml(sp.owner)})">${escapeHtml(rawBody.slice(sp.start, sp.end))}</mark>`;
+    cursor = sp.end;
+  }
+  out += escapeHtml(rawBody.slice(cursor));
+  return out;
 }
 
 function renderSelectedEmailInspector() {
@@ -275,6 +318,16 @@ function renderSelectedEmailInspector() {
     .map((t) => `<span class="badge badge-indigo">${escapeHtml(t.category)}</span>`)
     .join(" ");
 
+  const totalTasksInEmail = (ext.tasks || []).length;
+  const verifiedQuoteCount = (ext.tasks || []).filter((t) => t.quote_verified).length;
+  const engineShort = (ext.extraction_engine || "Gemini").includes("gemini")
+    ? "Gemini Schema"
+    : "Hybrid NLP";
+  const quoteStepLabel =
+    totalTasksInEmail > 0
+      ? `Quotes Grounded (${verifiedQuoteCount}/${totalTasksInEmail})`
+      : "Zero-Task Verified";
+
   container.innerHTML = `
     <div class="inspector-header">
       <div class="inspector-title-row">
@@ -289,6 +342,17 @@ function renderSelectedEmailInspector() {
         <div><strong>From:</strong> ${escapeHtml(em.sender_name)} &lt;${escapeHtml(em.sender_email)}&gt;</div>
         <div><strong>Date:</strong> ${em.timestamp.slice(0, 10)}</div>
         <div><strong>To:</strong> ${recStr}</div>
+      </div>
+
+      <!-- Transparent 4-Stage Extraction & Guardrail Trace -->
+      <div class="pipeline-trace" title="Deterministic guardrail &amp; extraction verification trace">
+        <span class="pipeline-step">1. Prompt Isolated <code>&lt;UNTRUSTED&gt;</code> &#10003;</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">2. ${escapeHtml(engineShort)} &#10003;</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">3. ${escapeHtml(quoteStepLabel)} &#10003;</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">4. Graph Synced (${entityCount} entities) &#10003;</span>
       </div>
     </div>
 
@@ -347,14 +411,14 @@ function renderSelectedEmailInspector() {
       </div>
     </details>
 
-    <!-- 4. Original Email Message -->
+    <!-- 4. Original Email Message (with Verbatim Grounded Spans Highlighted) -->
     <details class="clean-drawer" open>
       <summary>
-        <span>Original Email</span>
+        <span>Original Email ${verifiedQuoteCount > 0 ? `<span class="badge badge-emerald" style="margin-left:6px;">${verifiedQuoteCount} span${verifiedQuoteCount === 1 ? "" : "s"} highlighted</span>` : ""}</span>
         <span class="muted-sm">${escapeHtml(em.sender_email)}</span>
       </summary>
       <div class="drawer-body">
-        <div class="raw-email-box">${escapeHtml(em.body)}</div>
+        <div class="raw-email-box">${highlightGroundedQuotes(em.body, ext.tasks)}</div>
       </div>
     </details>
   `;
@@ -1067,30 +1131,113 @@ function getFilteredTasks() {
   });
 }
 
+function escapeJsArg(s) {
+  return String(s || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, "&quot;");
+}
+
 function renderTasksHub() {
   if (!appState.tasksData) return;
   const tasks = getFilteredTasks();
   const sched = appState.tasksData.schedule_summary || {};
 
+  // 1. Human-in-the-Loop Duplicate / Similar Task Merge Queue
+  const pendingDups = appState.tasksData.pending_duplicates || [];
+  const dupBanner = document.getElementById("duplicate-review-banner");
+  if (dupBanner) {
+    if (pendingDups.length > 0) {
+      dupBanner.style.display = "block";
+      const dupCardsHtml = pendingDups
+        .map((p) => {
+          const ex = p.existing_task || {};
+          const cand = p.candidate_task || {};
+          const simPct = Math.round((p.similarity || 0) * 100);
+          const pid = escapeJsArg(p.proposal_id);
+          return `
+            <div class="dup-card">
+              <div class="dup-card-main">
+                <div class="dup-badges">
+                  <span class="badge badge-indigo">${simPct}% Semantic Overlap</span>
+                  <span class="badge badge-amber">Human Approval Required</span>
+                  <span class="muted-sm">Owner: <strong>${escapeHtml(cand.owner || ex.owner)}</strong></span>
+                </div>
+                <div class="dup-compare-grid">
+                  <div class="dup-side">
+                    <div class="dup-side-label">Existing Task (<code>${escapeHtml(ex.id)}</code> &bull; Due ${escapeHtml(ex.due_date)})</div>
+                    <div class="dup-side-text">${escapeHtml(ex.deliverable)}</div>
+                  </div>
+                  <div class="dup-side">
+                    <div class="dup-side-label">Incoming Follow-Up (<code>${escapeHtml(cand.source_email_id)}</code> &bull; Due <strong>${escapeHtml(cand.due_date)}</strong>)</div>
+                    <div class="dup-side-text">${escapeHtml(cand.deliverable)}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="dup-actions">
+                <button type="button" class="btn btn-xs btn-primary" onclick="resolveDuplicateProposal('${pid}', 'merge')" title="Update existing task deadline &amp; notes without creating a duplicate row">
+                  &#10003; Approve Merge
+                </button>
+                <button type="button" class="btn btn-xs btn-secondary" onclick="resolveDuplicateProposal('${pid}', 'keep_separate')" title="Add incoming item as a separate task">
+                  Keep Separate
+                </button>
+                <button type="button" class="btn btn-xs btn-outline" onclick="resolveDuplicateProposal('${pid}', 'discard')" title="Discard incoming duplicate">
+                  Discard
+                </button>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+      dupBanner.innerHTML = `
+        <div class="dup-header">
+          <strong>&#128260; Duplicate / Follow-Up Task Review (${pendingDups.length} awaiting human decision)</strong>
+          <span class="muted-sm">Similar tasks are held for human review — never silently auto-merged.</span>
+        </div>
+        <div class="dup-list">${dupCardsHtml}</div>
+      `;
+    } else {
+      dupBanner.style.display = "none";
+    }
+  }
+
+  // 2. Schedule Overlap Alert Banner with Human-in-the-Loop Resolution Proposals
   const conflicts = sched.schedule_conflicts || [];
   const banner = document.getElementById("conflict-banner");
   if (conflicts.length > 0) {
     banner.style.display = "block";
     const rowsHtml = conflicts
-      .map(
-        (c) => `
+      .map((c) => {
+        const sp = c.shift_proposal;
+        const rp = c.reassign_proposal;
+        const shiftBtn = sp
+          ? `<button type="button" class="btn btn-xs btn-secondary" onclick="approveConflictShift('${escapeJsArg(sp.task_id)}', '${escapeJsArg(sp.new_start_date)}', '${escapeJsArg(sp.new_due_date)}')" title="Shift '${escapeHtml(sp.task_title)}' to ${escapeHtml(sp.new_start_date)} &rarr; ${escapeHtml(sp.new_due_date)}">&#10003; Shift &rarr; ${escapeHtml(sp.new_start_date.slice(5))}</button>`
+          : "";
+        const reassignBtn = rp
+          ? `<button type="button" class="btn btn-xs btn-outline" onclick="approveConflictReassign('${escapeJsArg(rp.task_id)}', '${escapeJsArg(rp.new_owner)}', '${escapeJsArg(rp.new_owner_email)}')" title="Reassign '${escapeHtml(rp.task_title)}' to lightest-loaded owner ${escapeHtml(rp.new_owner)} (${rp.active_hours}h active)">&#10003; Reassign &rarr; ${escapeHtml(rp.new_owner.split(" ")[0])} (${rp.active_hours}h)</button>`
+          : "";
+        return `
         <div class="conflict-item">
-          <span class="conflict-owner">${escapeHtml(c.owner)}</span>
-          <span class="badge badge-amber">${escapeHtml(c.overlap_window)}</span>
-          <span class="conflict-pair"><em>${escapeHtml(c.task_a)}</em> &harr; <em>${escapeHtml(c.task_b)}</em></span>
-        </div>`
-      )
+          <div class="conflict-info">
+            <span class="conflict-owner">${escapeHtml(c.owner)}</span>
+            <span class="badge badge-amber">${escapeHtml(c.overlap_window)}</span>
+            <span class="conflict-pair"><em>${escapeHtml(c.task_a)}</em> &harr; <em>${escapeHtml(c.task_b)}</em></span>
+          </div>
+          <div class="conflict-actions">
+            ${shiftBtn}
+            ${reassignBtn}
+          </div>
+        </div>`;
+      })
       .join("");
     banner.innerHTML = `
       <div class="conflict-header">
-        <strong>&#9888; Schedule Overlap Alert (${conflicts.length} detected)</strong>
+        <div>
+          <strong>&#9888; Schedule Overlap Alert (${conflicts.length} detected)</strong>
+          <span class="muted-sm" style="margin-left:8px;">Approve a date-shift or owner-reassignment below, or draft an email:</span>
+        </div>
         <button type="button" class="btn btn-xs btn-secondary" onclick="sendAgentPrompt('Check who has overlapping schedule conflicts on Critical tasks and draft a follow-up email to resolve the bottleneck')">
-          &#9993; Resolve via AI Assistant
+          &#9993; Draft Email via AI Assistant
         </button>
       </div>
       <div class="conflict-list">${rowsHtml}</div>
@@ -1481,6 +1628,18 @@ Quick follow-up from our AWS infrastructure sync in New York with Snowflake:
 
 Thanks,
 Marcus Vance`,
+  duplicate: `From: Marcus Vance <marcus.vance@nexusai.io>
+To: Liam O'Connor <liam.oconnor@nexusai.io>
+Date: 2026-11-01
+Subject: Re: Terraform GPU Node Pools — Deadline Extension & Cost Tags
+
+Hi Liam,
+
+Quick update on our cloud infrastructure sprint:
+1. Liam O'Connor: Provision Terraform GPU node pools and Redis cluster in us-east-1 and eu-central-1 with FinOps cost-allocation tags starting 2026-10-26, due by 2026-11-06 (Critical Priority).
+
+Thanks,
+Marcus Vance`,
 };
 
 function loadQuickPastePreset(key) {
@@ -1488,6 +1647,36 @@ function loadQuickPastePreset(key) {
   if (el && QUICK_PASTE_PRESETS[key]) {
     el.value = QUICK_PASTE_PRESETS[key];
   }
+}
+
+async function resolveDuplicateProposal(proposalId, action) {
+  await fetch(`/api/duplicates/${encodeURIComponent(proposalId)}/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }),
+  });
+  await refreshAllData();
+}
+
+async function approveConflictShift(taskId, newStartDate, newDueDate) {
+  await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ start_date: newStartDate, due_date: newDueDate }),
+  });
+  await refreshAllData();
+}
+
+async function approveConflictReassign(taskId, newOwner, newOwnerEmail) {
+  await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      owner: newOwner,
+      owner_email: newOwnerEmail || undefined,
+    }),
+  });
+  await refreshAllData();
 }
 
 async function submitIngestEmail(e) {
@@ -1512,7 +1701,11 @@ async function submitIngestEmail(e) {
       appState.selectedEmailId = res.email.id;
     }
     await refreshAllData();
-    switchTab("emails");
+    if (res.duplicates_flagged && res.duplicates_flagged > 0) {
+      switchTab("tasks");
+    } else {
+      switchTab("emails");
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = "✨ Extract & Update Graph";

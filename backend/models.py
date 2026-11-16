@@ -183,6 +183,12 @@ class SendApprovedEmailRequest(BaseModel):
     related_task_id: Optional[str] = None
 
 
+class ResolveDuplicateRequest(BaseModel):
+    action: Literal["merge", "keep_separate", "discard"] = Field(
+        ..., description="Human-in-the-Loop decision: merge into existing, keep_separate, or discard"
+    )
+
+
 class AgentChatResponse(BaseModel):
     reply: str
     engine: str

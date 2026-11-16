@@ -17,6 +17,7 @@ from backend.models import (
     IngestEmailRequest,
     QuickPasteEmailRequest,
     SendApprovedEmailRequest,
+    ResolveDuplicateRequest,
     TaskUpdateRequest,
     TaskCreateRequest,
     AgentChatRequest,
@@ -25,7 +26,7 @@ from backend.models import (
 from backend.sample_data import get_initial_emails, parse_eml_content
 from backend.extractor import EmailIntelligenceExtractor, parse_quick_paste_email
 from backend.graph_engine import OrganizationalGraphEngine
-from backend.productivity import ProductivityScheduleManager
+from backend.productivity import ProductivityScheduleManager, find_best_duplicate_match
 from backend.agent import EmailIntelligenceAgent
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -56,11 +57,13 @@ class SystemState:
         )
         self.emails: List[EmailMessage] = []
         self.tasks: List[ExtractedTask] = []
+        self.pending_duplicates: List[Dict[str, Any]] = []
         self.initialize_dataset()
 
     def initialize_dataset(self):
         self.emails = get_initial_emails()
         self.tasks = []
+        self.pending_duplicates = []
         for em in self.emails:
             ext = self.extractor.extract(em, prefer_gemini=False)
             em.extraction = ext
@@ -184,13 +187,31 @@ def ingest_email(req: IngestEmailRequest) -> Dict[str, Any]:
     extraction = state.extractor.extract(email_msg, prefer_gemini=req.use_gemini)
     email_msg.extraction = extraction
     state.emails.append(email_msg)
+
+    tasks_added = 0
+    duplicates_flagged = 0
     for t in extraction.tasks:
-        state.tasks.append(t)
+        dup_match = find_best_duplicate_match(t, state.tasks)
+        if dup_match is not None:
+            existing_task, sim_score = dup_match
+            state.pending_duplicates.append(
+                {
+                    "proposal_id": f"dup-{uuid.uuid4().hex[:6]}",
+                    "similarity": sim_score,
+                    "existing_task": existing_task.model_dump(),
+                    "candidate_task": t.model_dump(),
+                }
+            )
+            duplicates_flagged += 1
+        else:
+            state.tasks.append(t)
+            tasks_added += 1
 
     return {
         "status": "extracted",
         "email": email_msg.model_dump(),
-        "tasks_added": len(extraction.tasks),
+        "tasks_added": tasks_added,
+        "duplicates_flagged": duplicates_flagged,
     }
 
 
@@ -346,6 +367,53 @@ def list_tasks(
         "count": len(filtered),
         "tasks": [t.model_dump() for t in sorted(filtered, key=lambda x: x.due_date)],
         "schedule_summary": schedule_summary,
+        "pending_duplicates": state.pending_duplicates,
+    }
+
+
+@app.post("/api/duplicates/{proposal_id}/resolve")
+def resolve_duplicate_proposal(proposal_id: str, req: ResolveDuplicateRequest) -> Dict[str, Any]:
+    idx = next(
+        (i for i, p in enumerate(state.pending_duplicates) if p["proposal_id"] == proposal_id),
+        None,
+    )
+    if idx is None:
+        raise HTTPException(status_code=404, detail=f"Duplicate proposal '{proposal_id}' not found")
+
+    proposal = state.pending_duplicates.pop(idx)
+    cand = ExtractedTask(**proposal["candidate_task"])
+    ex_id = proposal["existing_task"]["id"]
+
+    if req.action == "merge":
+        for t in state.tasks:
+            if t.id == ex_id:
+                t.due_date = cand.due_date
+                if cand.priority == "Critical":
+                    t.priority = "Critical"
+                if cand.evidence_quote:
+                    t.evidence_quote = cand.evidence_quote
+                    t.quote_verified = cand.quote_verified
+                prev_notes = t.notes or ""
+                t.notes = f"{prev_notes} • Merged follow-up from {cand.source_email_id}".strip(" •")
+                return {
+                    "status": "merged",
+                    "updated_task": t.model_dump(),
+                    "remaining_duplicates": len(state.pending_duplicates),
+                }
+        state.tasks.append(cand)
+        return {"status": "merged_as_new", "updated_task": cand.model_dump()}
+
+    elif req.action == "keep_separate":
+        state.tasks.append(cand)
+        return {
+            "status": "kept_separate",
+            "added_task": cand.model_dump(),
+            "remaining_duplicates": len(state.pending_duplicates),
+        }
+
+    return {
+        "status": "discarded",
+        "remaining_duplicates": len(state.pending_duplicates),
     }
 
 
