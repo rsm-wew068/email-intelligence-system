@@ -1076,11 +1076,25 @@ function renderTasksHub() {
   const banner = document.getElementById("conflict-banner");
   if (conflicts.length > 0) {
     banner.style.display = "block";
-    banner.innerHTML = `<strong>Schedule Overlap Alert (${conflicts.length} detected):</strong> ` +
-      conflicts
-        .slice(0, 2)
-        .map((c) => `${escapeHtml(c.owner)} has overlapping high-priority tasks (<em>${escapeHtml(c.task_a)}</em> &amp; <em>${escapeHtml(c.task_b)}</em> during ${c.overlap_window})`)
-        .join(" • ");
+    const rowsHtml = conflicts
+      .map(
+        (c) => `
+        <div class="conflict-item">
+          <span class="conflict-owner">${escapeHtml(c.owner)}</span>
+          <span class="badge badge-amber">${escapeHtml(c.overlap_window)}</span>
+          <span class="conflict-pair"><em>${escapeHtml(c.task_a)}</em> &harr; <em>${escapeHtml(c.task_b)}</em></span>
+        </div>`
+      )
+      .join("");
+    banner.innerHTML = `
+      <div class="conflict-header">
+        <strong>&#9888; Schedule Overlap Alert (${conflicts.length} detected)</strong>
+        <button type="button" class="btn btn-xs btn-secondary" onclick="sendAgentPrompt('Check who has overlapping schedule conflicts on Critical tasks and draft a follow-up email to resolve the bottleneck')">
+          &#9993; Resolve via AI Assistant
+        </button>
+      </div>
+      <div class="conflict-list">${rowsHtml}</div>
+    `;
   } else {
     banner.style.display = "none";
   }

@@ -1,0 +1,60 @@
+name: CI & Deploy to Google Cloud Run
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Automated Test Suite (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Run unit & guardrail tests
+        env:
+          USE_VERTEX_AI: "false"
+        run: python -s -m pytest tests/test_system.py -v
+
+  deploy:
+    name: Deploy to Cloud Run (us-central1)
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (Keyless OIDC)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/249816165253/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "github-deployer@email-intel-sys-32662.iam.gserviceaccount.com"
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build & Deploy to Cloud Run
+        run: |
+          gcloud run deploy email-intelligence-system \
+            --source . \
+            --region us-central1 \
+            --project email-intel-sys-32662 \
+            --allow-unauthenticated \
+            --quiet

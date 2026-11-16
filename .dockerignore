@@ -12,6 +12,7 @@ eval/
 .coverage
 htmlcov/
 .git/
+.github/
 .gitignore
 .DS_Store
 *.log

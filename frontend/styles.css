@@ -886,13 +886,48 @@ body {
 }
 
 .conflict-banner {
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.38);
   color: #fde68a;
-  padding: 10px 16px;
-  border-radius: 9px;
+  padding: 12px 16px;
+  border-radius: 10px;
   margin-bottom: 14px;
-  font-size: 13px;
+  font-size: 12.5px;
+}
+
+.conflict-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.conflict-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 7px;
+  color: #e2e8f0;
+}
+
+.conflict-owner {
+  font-weight: 700;
+  color: #fcd34d;
+  min-width: 115px;
+}
+
+.conflict-pair {
+  color: #cbd5e1;
 }
 
 .task-view {
