@@ -5,7 +5,10 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
-    HOST=0.0.0.0
+    HOST=0.0.0.0 \
+    USE_VERTEX_AI=true \
+    GOOGLE_CLOUD_PROJECT=email-intel-sys-32662 \
+    GOOGLE_CLOUD_LOCATION=global
 
 WORKDIR /app
 
@@ -22,7 +25,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 COPY run.py .
-COPY .env* ./
 
 # Expose port (default 8000, overridable via PORT env var)
 EXPOSE 8000

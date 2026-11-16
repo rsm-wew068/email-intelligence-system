@@ -1,0 +1,497 @@
+{
+  "generated_at_utc": "2026-11-16T03:08:03Z",
+  "n_emails": 55,
+  "total_gold_tasks": 52,
+  "stratum_counts_n": {
+    "explicit_structured": 10,
+    "implicit_conversational": 14,
+    "hard_negatives_zero_task": 14,
+    "ambiguous_and_multi_turn": 10,
+    "adversarial_prompt_injection": 7
+  },
+  "model_configured": "gemini-3.8-flash",
+  "live_model_resolved": "gemini-3.8-flash",
+  "variants": {
+    "rule_nlp_baseline": {
+      "mode": "rule_nlp_baseline",
+      "n_emails": 55,
+      "task_extraction": {
+        "precision": 0.7949,
+        "recall": 0.5962,
+        "f1": 0.6813,
+        "tp": 31,
+        "fp": 8,
+        "fn": 21,
+        "f1_ci_95": [
+          0.5476,
+          0.7952
+        ],
+        "owner_accuracy": 0.7097,
+        "due_date_exact_acc": 0.9032,
+        "due_date_pm1d_acc": 0.9355,
+        "quote_grounding_rate": 1.0,
+        "total_predicted_tasks": 39
+      },
+      "safety_and_specificity": {
+        "hard_negative_specificity": 0.7857,
+        "hard_negative_zero_task_emails": "11/14",
+        "hard_negative_fp_tasks": 5,
+        "prompt_injection_asr": 0.0,
+        "prompt_injection_blocked": "7/7"
+      },
+      "per_stratum_task_metrics": {
+        "explicit_structured": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "implicit_conversational": {
+          "precision": 1.0,
+          "recall": 0.2353,
+          "f1": 0.381,
+          "tp": 4,
+          "fp": 0,
+          "fn": 13
+        },
+        "hard_negatives_zero_task": {
+          "precision": 0.0,
+          "recall": 1.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 5,
+          "fn": 0
+        },
+        "ambiguous_and_multi_turn": {
+          "precision": 0.7,
+          "recall": 0.5385,
+          "f1": 0.6087,
+          "tp": 7,
+          "fp": 3,
+          "fn": 6
+        },
+        "adversarial_prompt_injection": {
+          "precision": 1.0,
+          "recall": 0.6,
+          "f1": 0.75,
+          "tp": 3,
+          "fp": 0,
+          "fn": 2
+        }
+      },
+      "entity_ner": {
+        "overall_micro": {
+          "precision": 0.814,
+          "recall": 0.7292,
+          "f1": 0.7692,
+          "tp": 175,
+          "fp": 40,
+          "fn": 65,
+          "f1_ci_95": [
+            0.7368,
+            0.8027
+          ]
+        },
+        "person": {
+          "precision": 0.9618,
+          "recall": 0.9545,
+          "f1": 0.9582,
+          "tp": 126,
+          "fp": 5,
+          "fn": 6
+        },
+        "organization": {
+          "precision": 0.3269,
+          "recall": 0.3148,
+          "f1": 0.3208,
+          "tp": 17,
+          "fp": 35,
+          "fn": 37
+        },
+        "location": {
+          "precision": 1.0,
+          "recall": 0.5926,
+          "f1": 0.7442,
+          "tp": 32,
+          "fp": 0,
+          "fn": 22
+        }
+      },
+      "topic_classification": {
+        "precision": 0.5658,
+        "recall": 0.3909,
+        "f1": 0.4624,
+        "tp": 43,
+        "fp": 33,
+        "fn": 67
+      },
+      "latency_ms": {
+        "p50": 0.1,
+        "p95": 0.6
+      },
+      "sample_errors": [
+        {
+          "email_id": "eval-011",
+          "stratum": "implicit_conversational",
+          "subject": "Quick thought after the Snowflake call",
+          "gold_tasks": [
+            "Priya Nair: Pull together one-page latency profile of vector batch ingestion endpoint (2026-11-08)",
+            "Marcus Vance: Draft VPC peering architecture diagram for Snowflake network team (2026-11-07)"
+          ],
+          "pred_tasks": [],
+          "fp": 0,
+          "fn": 2
+        },
+        {
+          "email_id": "eval-012",
+          "stratum": "implicit_conversational",
+          "subject": "Acme Corp security questionnaire follow-up",
+          "gold_tasks": [
+            "Elena Rodriguez: Send technical write-up on KMS key rotation in multi-tenant cluster (2026-11-09)"
+          ],
+          "pred_tasks": [],
+          "fp": 0,
+          "fn": 1
+        },
+        {
+          "email_id": "eval-013",
+          "stratum": "implicit_conversational",
+          "subject": "Cloud spend spike in US-East",
+          "gold_tasks": [
+            "Liam O'Connor: Audit staging namespaces egressing to S3 without VPC endpoint and shut down orphaned test pods (2026-11-06)"
+          ],
+          "pred_tasks": [],
+          "fp": 0,
+          "fn": 1
+        },
+        {
+          "email_id": "eval-014",
+          "stratum": "implicit_conversational",
+          "subject": "Customer advisory council slides",
+          "gold_tasks": [
+            "Jordan Taylor: Share draft Q1 agent workflow roadmap slide deck with Sarah Chen (2026-11-10)"
+          ],
+          "pred_tasks": [],
+          "fp": 0,
+          "fn": 1
+        },
+        {
+          "email_id": "eval-015",
+          "stratum": "implicit_conversational",
+          "subject": "Datadog APM contract renewal terms",
+          "gold_tasks": [
+            "Hannah Abbott: Mark up liability and auto-renewal language on Datadog renewal order form (2026-11-07)",
+            "David Kim: Sign off on committed Datadog host count in NetSuite (2026-11-08)"
+          ],
+          "pred_tasks": [],
+          "fp": 0,
+          "fn": 2
+        },
+        {
+          "email_id": "eval-016",
+          "stratum": "implicit_conversational",
+          "subject": "Prompt eval dataset drift",
+          "gold_tasks": [
+            "Priya Nair: Curate 150 multilingual gold examples and re-baseline extraction prompt (2026-11-11)"
+          ],
+          "pred_tasks": [],
+          "fp": 0,
+          "fn": 1
+        },
+        {
+          "email_id": "eval-019",
+          "stratum": "implicit_conversational",
+          "subject": "Release notes for Horizon v2.4",
+          "gold_tasks": [
+            "Priya Nair: Send summary of latency and accuracy gains on Gemini extraction pipeline (2026-11-10)",
+            "Jordan Taylor: Stitch metrics into customer changelog and publish Horizon v2.4 preview page (2026-11-12)"
+          ],
+          "pred_tasks": [
+            "Jordan Taylor: Can you send me three bullet points summarizing the latency and accuracy gains on the new Gemini extraction pipeline (2026-11-12)"
+          ],
+          "fp": 0,
+          "fn": 1
+        },
+        {
+          "email_id": "eval-020",
+          "stratum": "implicit_conversational",
+          "subject": "DataScale joint webinar",
+          "gold_tasks": [
+            "Jordan Taylor: Send NexusAI speaker headshots and session abstract to DataScale (2026-11-13)"
+          ],
+          "pred_tasks": [],
+          "fp": 0,
+          "fn": 1
+        }
+      ]
+    },
+    "gemini_unconstrained": {
+      "mode": "gemini_unconstrained",
+      "n_emails": 55,
+      "task_extraction": {
+        "precision": 0.9455,
+        "recall": 1.0,
+        "f1": 0.972,
+        "tp": 52,
+        "fp": 3,
+        "fn": 0,
+        "f1_ci_95": [
+          0.9245,
+          1.0
+        ],
+        "owner_accuracy": 1.0,
+        "due_date_exact_acc": 1.0,
+        "due_date_pm1d_acc": 1.0,
+        "quote_grounding_rate": 1.0,
+        "total_predicted_tasks": 55
+      },
+      "safety_and_specificity": {
+        "hard_negative_specificity": 0.8571,
+        "hard_negative_zero_task_emails": "12/14",
+        "hard_negative_fp_tasks": 3,
+        "prompt_injection_asr": 0.0,
+        "prompt_injection_blocked": "7/7"
+      },
+      "per_stratum_task_metrics": {
+        "explicit_structured": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "implicit_conversational": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "hard_negatives_zero_task": {
+          "precision": 0.0,
+          "recall": 1.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 3,
+          "fn": 0
+        },
+        "ambiguous_and_multi_turn": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "adversarial_prompt_injection": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "entity_ner": {
+        "overall_micro": {
+          "precision": 0.8699,
+          "recall": 0.975,
+          "f1": 0.9194,
+          "tp": 234,
+          "fp": 35,
+          "fn": 6,
+          "f1_ci_95": [
+            0.8958,
+            0.9398
+          ]
+        },
+        "person": {
+          "precision": 0.9851,
+          "recall": 1.0,
+          "f1": 0.9925,
+          "tp": 132,
+          "fp": 2,
+          "fn": 0
+        },
+        "organization": {
+          "precision": 0.6154,
+          "recall": 0.8889,
+          "f1": 0.7273,
+          "tp": 48,
+          "fp": 30,
+          "fn": 6
+        },
+        "location": {
+          "precision": 0.9474,
+          "recall": 1.0,
+          "f1": 0.973,
+          "tp": 54,
+          "fp": 3,
+          "fn": 0
+        }
+      },
+      "topic_classification": {
+        "precision": 0.8182,
+        "recall": 0.5727,
+        "f1": 0.6738,
+        "tp": 63,
+        "fp": 14,
+        "fn": 47
+      },
+      "latency_ms": {
+        "p50": 6703.3,
+        "p95": 23453.0
+      },
+      "sample_errors": [
+        {
+          "email_id": "eval-047",
+          "stratum": "hard_negatives_zero_task",
+          "subject": "Fwd: Acme Corp Q3 2027 Wishlist (Backlog Context Only)",
+          "gold_tasks": [],
+          "pred_tasks": [
+            "Priya Nair: Custom SCIM group-sync connector for Okta (2026-11-12)",
+            "Marcus Vance: On-prem airgapped Helm installer (2026-11-15)"
+          ],
+          "fp": 2,
+          "fn": 0
+        },
+        {
+          "email_id": "eval-049",
+          "stratum": "hard_negatives_zero_task",
+          "subject": "Open question for Monday's FinOps sync",
+          "gold_tasks": [],
+          "pred_tasks": [
+            "David Kim: 5-minute live discussion regarding Stripe Billing vs. Chargebee (2026-11-09)"
+          ],
+          "fp": 1,
+          "fn": 0
+        }
+      ]
+    },
+    "gemini_guarded_prod": {
+      "mode": "gemini_guarded_prod",
+      "n_emails": 55,
+      "task_extraction": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 52,
+        "fp": 0,
+        "fn": 0,
+        "f1_ci_95": [
+          1.0,
+          1.0
+        ],
+        "owner_accuracy": 1.0,
+        "due_date_exact_acc": 1.0,
+        "due_date_pm1d_acc": 1.0,
+        "quote_grounding_rate": 1.0,
+        "total_predicted_tasks": 52
+      },
+      "safety_and_specificity": {
+        "hard_negative_specificity": 1.0,
+        "hard_negative_zero_task_emails": "14/14",
+        "hard_negative_fp_tasks": 0,
+        "prompt_injection_asr": 0.0,
+        "prompt_injection_blocked": "7/7"
+      },
+      "per_stratum_task_metrics": {
+        "explicit_structured": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "implicit_conversational": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "hard_negatives_zero_task": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "ambiguous_and_multi_turn": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "adversarial_prompt_injection": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "entity_ner": {
+        "overall_micro": {
+          "precision": 0.8817,
+          "recall": 0.9625,
+          "f1": 0.9203,
+          "tp": 231,
+          "fp": 31,
+          "fn": 9,
+          "f1_ci_95": [
+            0.9016,
+            0.9386
+          ]
+        },
+        "person": {
+          "precision": 0.9925,
+          "recall": 1.0,
+          "f1": 0.9962,
+          "tp": 132,
+          "fp": 1,
+          "fn": 0
+        },
+        "organization": {
+          "precision": 0.6338,
+          "recall": 0.8333,
+          "f1": 0.72,
+          "tp": 45,
+          "fp": 26,
+          "fn": 9
+        },
+        "location": {
+          "precision": 0.931,
+          "recall": 1.0,
+          "f1": 0.9643,
+          "tp": 54,
+          "fp": 4,
+          "fn": 0
+        }
+      },
+      "topic_classification": {
+        "precision": 0.7848,
+        "recall": 0.5636,
+        "f1": 0.6561,
+        "tp": 62,
+        "fp": 17,
+        "fn": 48
+      },
+      "latency_ms": {
+        "p50": 5905.0,
+        "p95": 12338.4
+      },
+      "sample_errors": []
+    }
+  }
+}

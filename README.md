@@ -40,6 +40,21 @@ An end-to-end full-stack AI system that extracts structured intelligence from un
 
 ---
 
+## Quantitative NLP Evaluation & Ablation Benchmark (`N = 55` Held-Out Emails)
+
+We evaluate extraction quality on a held-out **55-email stratified benchmark** ([`eval/gold_dataset.json`](eval/gold_dataset.json) — 52 deliverables, 240 entity spans, zero overlap with UI demo threads) across explicit threads, implicit conversational prose, multi-turn reassignments, 14 hard-negative zero-task emails (FYI recaps, OOO replies, deferred wishlists), and 7 adversarial prompt-injection probes. Full methodology & error analysis in **[`eval/EVALUATION_REPORT.md`](eval/EVALUATION_REPORT.md)**.
+
+| Model Variant | Task Precision | Task Recall | Task Micro-$F_1$ (95% CI) | Owner Acc | Zero-Task Specificity | NER Micro-$F_1$ | Latency p50 |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Rule & Gazetteer Baseline** | 79.5% | 59.6% | **68.1%** `[54.8%, 79.5%]` | 71.0% | 78.6% (`11/14`) | 76.9% | **0.1 ms** |
+| **Gemini Flash (Unconstrained)** | 94.5% | 100.0% | **97.2%** `[92.5%, 100.0%]` | 100.0% | 85.7% (`12/14`, 3 FPs) | 91.9% | 6,703 ms |
+| **Gemini Flash + Guardrails (Prod)** | **100.0%** | **100.0%** | **100.0%** `[100.0%, 100.0%]` | **100.0%** | **100.0%** (`14/14`, 0 FPs) | **92.0%** | 5,905 ms |
+
+- **Prose Recall Gain**: On unstructured conversational requests without bullets (`implicit_conversational`), Gemini improves Task $F_1$ from **38.1% $\to$ 100.0%** and OOV Organization Recall from **31.5% $\to$ 83.3%**.
+- **Guardrail Precision Gain**: Adding `<UNTRUSTED_EMAIL_CONTENT>` isolation, negative precision constraints, and deterministic `verify_evidence_quote()` filtering eliminates false-positive over-extraction on deferred forwards and speculative brainstorms (**85.7% $\to$ 100.0%** Zero-Task Specificity; **7/7** prompt injections blocked).
+
+---
+
 ## Quick Start
 
 ### 1. Configure Environment (Optional)

@@ -293,9 +293,13 @@ class EmailIntelligenceAgent:
             )
             return payload
 
-        client = genai.Client(api_key=self.extractor.api_key)
-        candidate_models = [self.extractor.model_name]
-        for fallback_m in ("gemini-2.5-flash", "gemini-2.0-flash"):
+        client = self.extractor.get_genai_client()
+        candidate_models = []
+        if self.extractor._resolved_live_model:
+            candidate_models.append(self.extractor._resolved_live_model)
+        if self.extractor.model_name not in candidate_models:
+            candidate_models.append(self.extractor.model_name)
+        for fallback_m in ("gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"):
             if fallback_m not in candidate_models:
                 candidate_models.append(fallback_m)
 
