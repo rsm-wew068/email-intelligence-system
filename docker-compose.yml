@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  email-intelligence:
+    build: .
+    container_name: nexusai-email-intelligence
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
+    restart: unless-stopped
+

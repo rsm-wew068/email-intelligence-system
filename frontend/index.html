@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusAI — Email Intelligence, Organizational Graph & Productivity Agent</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+  <link rel="stylesheet" href="/static/styles.css?v=7.0" />
+</head>
+<body>
+  <!-- Top Navigation Header -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="12" cy="5" r="3"></circle>
+          <circle cx="5" cy="19" r="3"></circle>
+          <circle cx="19" cy="19" r="3"></circle>
+          <line x1="10.5" y1="7.5" x2="6.5" y2="16.5"></line>
+          <line x1="13.5" y1="7.5" x2="17.5" y2="16.5"></line>
+          <line x1="8" y1="19" x2="16" y2="19"></line>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">NexusAI Email Intelligence</div>
+        <div class="brand-subtitle">Automated Extraction &bull; Organizational &amp; Temporal Graph &bull; Task Scheduler Agent</div>
+      </div>
+    </div>
+
+    <nav class="nav-tabs" role="tablist">
+      <button class="nav-tab active" data-tab="emails" onclick="switchTab('emails')">
+        <span>1. Email Extraction Studio</span>
+        <span class="tab-badge" id="badge-emails">8</span>
+      </button>
+      <button class="nav-tab" data-tab="graph" onclick="switchTab('graph')">
+        <span>2. Org, Relational &amp; Temporal Graph</span>
+        <span class="tab-badge" id="badge-nodes">0</span>
+      </button>
+      <button class="nav-tab" data-tab="tasks" onclick="switchTab('tasks')">
+        <span>3. Productivity &amp; Schedule Hub</span>
+        <span class="tab-badge" id="badge-tasks">0</span>
+      </button>
+      <button class="nav-tab" data-tab="agent" onclick="switchTab('agent')">
+        <span>4. AI Intelligence Agent</span>
+        <span class="tab-badge badge-accent">Live</span>
+      </button>
+    </nav>
+
+    <div class="topbar-actions">
+      <button class="btn btn-outline" onclick="openIngestModal()">+ Extract Email</button>
+      <div class="btn btn-outline" style="cursor:default;pointer-events:none;" title="Configured via server .env file">
+        <span class="status-dot" id="gemini-dot"></span>
+        <span id="gemini-status-label">Engine Status</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Executive KPI Ribbon -->
+  <section class="kpi-ribbon" id="kpi-ribbon">
+    <div class="kpi-card">
+      <div class="kpi-label">Analyzed Emails</div>
+      <div class="kpi-value" id="kpi-emails">0</div>
+      <div class="kpi-sub" id="kpi-threads">Across 0 threads</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Extracted Entities</div>
+      <div class="kpi-value" id="kpi-entities">0</div>
+      <div class="kpi-sub" id="kpi-entities-breakdown">People, Orgs, Locations</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Identified Topics</div>
+      <div class="kpi-value" id="kpi-topics">0</div>
+      <div class="kpi-sub">Multi-domain taxonomy</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Scheduled Deliverables</div>
+      <div class="kpi-value" id="kpi-tasks">0</div>
+      <div class="kpi-sub" id="kpi-critical">0 Critical priority</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Org Graph Network</div>
+      <div class="kpi-value" id="kpi-graph">0</div>
+      <div class="kpi-sub" id="kpi-edges">0 relational edges</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Schedule Conflicts</div>
+      <div class="kpi-value kpi-warn" id="kpi-conflicts">0</div>
+      <div class="kpi-sub">Overlapping high-priority windows</div>
+    </div>
+  </section>
+
+  <!-- Main Workspace Container -->
+  <main class="workspace">
+    <!-- TAB 1: EMAIL EXTRACTION STUDIO -->
+    <section id="tab-emails" class="tab-panel active">
+      <div class="split-layout">
+        <!-- Left Email List -->
+        <aside class="email-sidebar">
+          <div class="panel-header">
+            <div>
+              <h3>Corporate Inbox Stream</h3>
+              <p class="muted-sm">Select an email to inspect AI-extracted intelligence</p>
+            </div>
+            <div class="header-btn-group">
+              <label class="btn btn-xs btn-secondary" for="eml-file-input" title="Upload .eml file">
+                Upload .eml
+              </label>
+              <input type="file" id="eml-file-input" accept=".eml,.txt" style="display:none" onchange="handleEmlUpload(event)" />
+              <button class="btn btn-xs btn-primary" onclick="openIngestModal()">+ New</button>
+            </div>
+          </div>
+          <div class="search-box">
+            <input type="text" id="email-search" placeholder="Filter by subject, sender, topic, entity..." oninput="renderEmailList()" />
+          </div>
+          <div class="email-list" id="email-list-container"></div>
+        </aside>
+
+        <!-- Right Extraction Inspector -->
+        <div class="email-inspector" id="email-inspector">
+          <div class="empty-state">Select an email to view extracted intelligence.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ORGANIZATIONAL, RELATIONAL & TEMPORAL GRAPH -->
+    <section id="tab-graph" class="tab-panel">
+      <div class="graph-layout">
+        <div class="graph-main">
+          <!-- Graph Controls & Temporal Slider -->
+          <div class="graph-toolbar">
+            <div class="filter-pills">
+              <span class="toolbar-label">Node Layers:</span>
+              <label class="pill-toggle"><input type="checkbox" checked onchange="toggleGraphLayer('Person', this.checked)" /> <span class="dot dot-person"></span>People</label>
+              <label class="pill-toggle"><input type="checkbox" checked onchange="toggleGraphLayer('Organization', this.checked)" /> <span class="dot dot-org"></span>Organizations</label>
+              <label class="pill-toggle"><input type="checkbox" checked onchange="toggleGraphLayer('Topic', this.checked)" /> <span class="dot dot-topic"></span>Topics</label>
+              <label class="pill-toggle"><input type="checkbox" onchange="toggleGraphLayer('Location', this.checked)" /> <span class="dot dot-loc"></span>Locations</label>
+              <label class="pill-toggle"><input type="checkbox" onchange="toggleGraphLayer('Task', this.checked)" /> <span class="dot dot-task"></span>Deliverables</label>
+            </div>
+
+            <div class="temporal-controls">
+              <span class="toolbar-label">Temporal Evolution Cutoff:</span>
+              <input type="range" id="temporal-slider" min="0" max="7" value="7" oninput="onTemporalSliderChange(this.value)" />
+              <span class="badge badge-indigo" id="temporal-date-label">All Dates (Full Graph)</span>
+              <button class="btn btn-xs btn-secondary" onclick="reheatGraphSimulation()" title="Re-run layout spacing">Re-Layout</button>
+              <button class="btn btn-xs btn-secondary" onclick="resetGraphCamera()">Fit &amp; Center</button>
+            </div>
+          </div>
+
+          <div class="canvas-wrapper">
+            <canvas id="network-canvas"></canvas>
+            <div id="graph-tooltip" class="graph-tooltip" style="display:none"></div>
+            <div class="graph-legend">
+              <div><span class="dot dot-person"></span> Person (Sized by Influence)</div>
+              <div><span class="dot dot-org"></span> Organization / Team</div>
+              <div><span class="dot dot-topic"></span> Topic</div>
+              <div><span class="dot dot-loc"></span> Location</div>
+              <div><span class="dot dot-task"></span> Task Deliverable</div>
+            </div>
+          </div>
+
+          <!-- Temporal Timeline Bar Chart & Milestones -->
+          <div class="temporal-strip">
+            <div class="temporal-strip-header">
+              <h4>Temporal Communication &amp; Milestone Timeline</h4>
+              <span class="muted-sm">Chronological email interactions, task kickoffs, and launch gates</span>
+            </div>
+            <div class="milestone-track" id="milestone-track"></div>
+          </div>
+        </div>
+
+        <!-- Right Graph Analytics Sidebar -->
+        <aside class="graph-sidebar">
+          <div class="card-section" id="selected-node-card" style="display:none">
+            <div class="section-title-row">
+              <h4>Selected Node Inspector</h4>
+              <button class="btn btn-xs btn-outline" onclick="clearSelectedNode()">Clear</button>
+            </div>
+            <div id="selected-node-content"></div>
+          </div>
+
+          <div class="card-section">
+            <h4>Top Organizational Influencers (PageRank)</h4>
+            <p class="muted-sm">Key decision-makers and communication hubs</p>
+            <div id="influencers-list" class="metric-list"></div>
+          </div>
+
+          <div class="card-section">
+            <h4>Cross-Team Bridges (Betweenness)</h4>
+            <p class="muted-sm">Connectors bridging departments &amp; external vendors</p>
+            <div id="bridges-list" class="metric-list"></div>
+          </div>
+
+          <div class="card-section">
+            <h4>Detected Working Clusters (Modularity)</h4>
+            <div id="communities-list" class="community-list"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- TAB 3: PRODUCTIVITY & SCHEDULE HUB -->
+    <section id="tab-tasks" class="tab-panel">
+      <div class="tasks-toolbar">
+        <div class="view-switcher">
+          <button class="btn btn-sm active" id="view-btn-table" onclick="switchTaskView('table')">Structured Schedule Table</button>
+          <button class="btn btn-sm" id="view-btn-kanban" onclick="switchTaskView('kanban')">Kanban Workflow Board</button>
+          <button class="btn btn-sm" id="view-btn-gantt" onclick="switchTaskView('gantt')">Gantt Timeline &amp; Workload</button>
+        </div>
+
+        <div class="task-filters">
+          <select id="filter-owner" onchange="renderTasksHub()">
+            <option value="">All Owners</option>
+          </select>
+          <select id="filter-priority" onchange="renderTasksHub()">
+            <option value="">All Priorities</option>
+            <option value="Critical">Critical Priority</option>
+            <option value="High">High Priority</option>
+            <option value="Medium">Medium Priority</option>
+            <option value="Low">Low Priority</option>
+          </select>
+          <select id="filter-status" onchange="renderTasksHub()">
+            <option value="">All Statuses</option>
+            <option value="Todo">Todo</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Blocked">Blocked</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+
+        <div class="export-actions">
+          <button class="btn btn-sm btn-primary" onclick="openNewTaskModal()">+ Add Task</button>
+          <a class="btn btn-sm btn-outline" href="/api/schedule/export/ics" download="email-intelligence-schedule.ics">Export iCal (.ics)</a>
+          <a class="btn btn-sm btn-outline" href="/api/schedule/export/csv" download="email-intelligence-tasks.csv">Export CSV</a>
+          <a class="btn btn-sm btn-outline" href="/api/schedule/export/md" download="email-intelligence-schedule.md">Export Markdown</a>
+        </div>
+      </div>
+
+      <!-- Conflict Alert Banner -->
+      <div id="conflict-banner" class="conflict-banner" style="display:none"></div>
+
+      <!-- View 1: Structured Deliverable Schedule Table -->
+      <div id="task-view-table" class="task-view active">
+        <div class="table-container">
+          <table class="schedule-table">
+            <thead>
+              <tr>
+                <th>Task ID</th>
+                <th>Owner</th>
+                <th>Deliverable &amp; Context</th>
+                <th>Start Date</th>
+                <th>Due Date</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Source Email</th>
+              </tr>
+            </thead>
+            <tbody id="schedule-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- View 2: Kanban Workflow Board -->
+      <div id="task-view-kanban" class="task-view">
+        <div class="kanban-grid" id="kanban-grid"></div>
+      </div>
+
+      <!-- View 3: Gantt Timeline & Owner Workload -->
+      <div id="task-view-gantt" class="task-view">
+        <div class="gantt-layout">
+          <div class="gantt-card">
+            <h4>Deliverable Schedule Timeline (Gantt Chart)</h4>
+            <div id="gantt-chart-container" class="gantt-container"></div>
+          </div>
+          <div class="workload-card">
+            <h4>Owner Capacity &amp; Utilization Analysis</h4>
+            <div id="workload-list-container"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: AI INTELLIGENCE AGENT -->
+    <section id="tab-agent" class="tab-panel">
+      <div class="agent-layout">
+        <aside class="agent-sidebar">
+          <div class="card-section">
+            <h3>Autonomous Intelligence Agent</h3>
+            <p class="muted-sm">
+              Equipped with live tools to extract unstructured emails, query the NetworkX organizational graph, detect schedule conflicts, and automate task workflows.
+            </p>
+            <div class="agent-tools-list">
+              <div class="tool-chip"><code>extract_email_intelligence</code></div>
+              <div class="tool-chip"><code>query_organizational_graph</code></div>
+              <div class="tool-chip"><code>list_and_filter_tasks</code></div>
+              <div class="tool-chip"><code>create_or_update_task</code></div>
+              <div class="tool-chip"><code>export_schedule_to_tool</code></div>
+            </div>
+          </div>
+
+          <div class="card-section">
+            <h4>One-Click Agent Playbooks</h4>
+            <div class="playbook-buttons">
+              <button class="playbook-btn" onclick="sendAgentPrompt('Who are the top organizational influencers and cross-team bridges in the graph?')">
+                <strong>Organizational Graph Analysis</strong>
+                <span>Identify key influencers, PageRank scores, and cross-team bridges</span>
+              </button>
+              <button class="playbook-btn" onclick="sendAgentPrompt('Show all Critical priority deliverables and detect schedule conflicts across owners')">
+                <strong>Critical Schedule &amp; Conflict Audit</strong>
+                <span>List critical deliverables and flag overlapping high-priority windows</span>
+              </button>
+              <button class="playbook-btn" onclick="sendAgentPrompt('Show Liam O\'Connor\'s deliverable schedule and workload utilization')">
+                <strong>Owner Deep-Dive: Liam O'Connor</strong>
+                <span>Inspect SRE deliverables, security tasks, and timeline overlaps</span>
+              </button>
+              <button class="playbook-btn" onclick="sendAgentPrompt('Show Marcus Vance\'s tasks, role, and communication centrality')">
+                <strong>Owner Deep-Dive: Marcus Vance</strong>
+                <span>Inspect Principal Architect deliverables and graph centrality</span>
+              </button>
+              <button class="playbook-btn" onclick="sendAgentPrompt('Extract from this new email: Subject: Q4 Customer Advisory Board in Chicago. Hi Jordan Taylor and Sarah Chen, please finalize the executive slide deck starting 2026-11-05 and deliver it by 2026-11-14 (High Priority). Also Claire Dupont will confirm keynote panelists by 2026-11-11.')">
+                <strong>Live Agent Email Extraction Test</strong>
+                <span>Extract entities, topics &amp; tasks from raw text and add to schedule</span>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <div class="agent-chat-main">
+          <div class="chat-messages" id="chat-messages">
+            <div class="chat-msg agent">
+              <div class="msg-header">
+                <strong>NexusAI Intelligence Agent</strong>
+                <span class="badge badge-indigo">Tool-Augmented Agent Ready</span>
+              </div>
+              <div class="msg-body">
+                Hello! I am connected to your live <strong>Email Extraction Pipeline</strong>, <strong>Organizational &amp; Temporal Graph Engine</strong>, and <strong>Productivity Task Scheduler</strong>.
+                <br/><br/>
+                Ask me to analyze organizational bottlenecks, inspect any team member's deliverables, update task statuses (e.g., <code>mark tsk-001-01 as completed</code>), or paste a raw email to extract and schedule its tasks automatically.
+              </div>
+            </div>
+          </div>
+
+          <form class="chat-input-bar" onsubmit="handleAgentSubmit(event)">
+            <textarea
+              id="agent-input"
+              rows="2"
+              placeholder="Ask about graph centrality, owner schedules, timeline conflicts, or paste an email to extract... (Press Enter to send, Shift+Enter for new line)"
+              onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); handleAgentSubmit(event);}"
+            ></textarea>
+            <button type="submit" class="btn btn-primary" id="agent-send-btn">Run Agent</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL 1: QUICK PASTE & EXTRACT NEW EMAIL -->
+  <div class="modal-backdrop" id="ingest-modal" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Quick-Paste Email Extraction</h3>
+          <p class="muted-sm" style="margin-top:2px;">Paste any raw email, forwarded thread, or plain message — headers, dates, entities &amp; grounded quotes are auto-extracted.</p>
+        </div>
+        <button class="btn-close" onclick="closeIngestModal()">&times;</button>
+      </div>
+      <form onsubmit="submitIngestEmail(event)" class="modal-form">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <span class="muted-sm" style="font-weight:600;">Try sample preset:</span>
+          <button type="button" class="btn btn-xs btn-secondary" onclick="loadQuickPastePreset('security')">Preset 1: SOC2 &amp; Load-Test Gate</button>
+          <button type="button" class="btn btn-xs btn-secondary" onclick="loadQuickPastePreset('gpu')">Preset 2: AWS GPU Capacity &amp; FinOps</button>
+          <button type="button" class="btn btn-xs btn-outline" onclick="document.getElementById('ing-raw-paste').value='';document.getElementById('ing-raw-paste').focus();">Clear</button>
+        </div>
+
+        <div class="form-group">
+          <label>Paste Raw Email or Message (Headers Optional)</label>
+          <textarea id="ing-raw-paste" rows="9" placeholder="Paste any copied email (with or without From:/To:/Subject: headers) or plain message..." required>From: Sarah Chen <sarah.chen@nexusai.io>
+To: Marcus Vance <marcus.vance@nexusai.io>, Elena Rodriguez <elena.rodriguez@nexusai.io>
+Date: 2026-11-01
+Subject: Final Go/No-Go Production Readiness & SOC2 Sign-Off
+
+Hi Marcus and Elena,
+
+Following our executive review in San Francisco with Acme Corp, please complete these final readiness items:
+1. Marcus Vance: Complete final load testing benchmark report in Seattle starting 2026-11-02, due by 2026-11-08 (Critical Priority).
+2. Elena Rodriguez: Deliver final SOC2 compliance attestation package to Claire Dupont at Acme Corp in London starting 2026-11-03, due by 2026-11-09 (High Priority).
+
+Best,
+Sarah Chen</textarea>
+        </div>
+
+        <div class="guardrail-hint">
+          <span>&#128737; <strong>Guardrails Active:</strong> Untrusted content prompt-isolation + deterministic verbatim quote grounding on extracted tasks.</span>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeIngestModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="ing-submit-btn">&#10024; Extract &amp; Update Graph</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: ADD MANUAL SCHEDULE TASK -->
+  <div class="modal-backdrop" id="task-modal" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Add Structured Task to Schedule</h3>
+        <button class="btn-close" onclick="closeNewTaskModal()">&times;</button>
+      </div>
+      <form onsubmit="submitNewTask(event)" class="modal-form">
+        <div class="form-group">
+          <label>Task Title</label>
+          <input type="text" id="nt-title" placeholder="e.g., Finalize API Gateway Rate Limiting" required />
+        </div>
+        <div class="form-group">
+          <label>Concrete Deliverable</label>
+          <input type="text" id="nt-deliverable" placeholder="e.g., Production Envoy rate-limit config and load test report" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Owner Name</label>
+            <input type="text" id="nt-owner" value="Marcus Vance" required />
+          </div>
+          <div class="form-group">
+            <label>Priority</label>
+            <select id="nt-priority">
+              <option value="Critical">Critical</option>
+              <option value="High" selected>High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start Date</label>
+            <input type="date" id="nt-start" value="2026-11-02" required />
+          </div>
+          <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="nt-due" value="2026-11-09" required />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeNewTaskModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add to Schedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=7.0"></script>
+</body>
+</html>
+
