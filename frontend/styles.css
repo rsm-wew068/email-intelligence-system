@@ -581,11 +581,10 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 350px;
   gap: 18px;
-  height: calc(100vh - 195px);
-  min-height: 600px;
+  min-height: 620px;
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
+  align-items: stretch;
 }
 
 .graph-main {
@@ -593,8 +592,8 @@ body {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  width: 100%;
   max-width: 100%;
-  overflow: hidden;
 }
 
 .graph-toolbar {
@@ -649,14 +648,13 @@ body {
 
 .canvas-wrapper {
   position: relative;
-  flex: 1;
   width: 100%;
   min-width: 0;
+  height: clamp(360px, 50vh, 520px);
   background: radial-gradient(circle at center, #141d2f 0%, #0b0f19 100%);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow: hidden;
-  min-height: 390px;
 }
 
 #network-canvas {
@@ -702,6 +700,11 @@ body {
 }
 
 .temporal-strip {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -712,23 +715,32 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .milestone-track {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(200px, 225px);
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
-  padding-bottom: 4px;
+  overflow-y: hidden;
+  padding-bottom: 6px;
 }
 
 .milestone-card {
-  min-width: 210px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 9px 11px;
   font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .graph-sidebar {
@@ -736,6 +748,8 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 14px;
+  max-height: calc(100vh - 195px);
+  min-height: 540px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
