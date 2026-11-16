@@ -645,7 +645,16 @@ class EmailIntelligenceAgent:
         ) and not extracted_email_obj
 
         if wants_email_draft:
-            target_owner = matched_owners[0] if matched_owners else None
+            explicit_named = [
+                w["owner"]
+                for w in sched_summary["owner_workloads"]
+                if w["owner"].lower() in msg_lower or w["owner"].split()[0].lower() in msg_lower
+            ]
+            target_owner = explicit_named[0] if explicit_named else None
+            if not target_owner and "conflict" in msg_lower and sched_summary["schedule_conflicts"]:
+                target_owner = sched_summary["schedule_conflicts"][0]["owner"]
+            if not target_owner and matched_owners:
+                target_owner = matched_owners[0]
             if not target_owner and sched_summary["schedule_conflicts"]:
                 target_owner = sched_summary["schedule_conflicts"][0]["owner"]
             if not target_owner and tasks:
