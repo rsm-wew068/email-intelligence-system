@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NexusAI — Email Intelligence, Organizational Graph & Productivity Agent</title>
+  <title>NexusAI — Email Intelligence &amp; Task Agent</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
-  <link rel="stylesheet" href="/static/styles.css?v=9.0" />
+  <link rel="stylesheet" href="/static/styles.css?v=10.0" />
 </head>
 <body>
   <!-- Top Navigation Header -->
   <header class="topbar">
     <div class="brand">
       <div class="brand-logo">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <circle cx="12" cy="5" r="3"></circle>
           <circle cx="5" cy="19" r="3"></circle>
           <circle cx="19" cy="19" r="3"></circle>
@@ -22,95 +22,73 @@
         </svg>
       </div>
       <div>
-        <div class="brand-title">NexusAI Email Intelligence</div>
-        <div class="brand-subtitle">Automated Extraction &bull; Organizational &amp; Temporal Graph &bull; Task Scheduler Agent</div>
+        <div class="brand-title">NexusAI</div>
+        <div class="brand-subtitle">Email-to-Action Intelligence</div>
       </div>
     </div>
 
     <nav class="nav-tabs" role="tablist">
       <button class="nav-tab active" data-tab="emails" onclick="switchTab('emails')">
-        <span>1. Email Extraction Studio</span>
+        <span>Inbox</span>
         <span class="tab-badge" id="badge-emails">8</span>
       </button>
-      <button class="nav-tab" data-tab="graph" onclick="switchTab('graph')">
-        <span>2. Org, Relational &amp; Temporal Graph</span>
-        <span class="tab-badge" id="badge-nodes">0</span>
-      </button>
       <button class="nav-tab" data-tab="tasks" onclick="switchTab('tasks')">
-        <span>3. Productivity &amp; Schedule Hub</span>
+        <span>Tasks</span>
         <span class="tab-badge" id="badge-tasks">0</span>
       </button>
+      <button class="nav-tab" data-tab="graph" onclick="switchTab('graph')">
+        <span>Org Graph</span>
+        <span class="tab-badge" id="badge-nodes">0</span>
+      </button>
       <button class="nav-tab" data-tab="agent" onclick="switchTab('agent')">
-        <span>4. AI Intelligence Agent</span>
+        <span>AI Assistant</span>
         <span class="tab-badge badge-accent">Live</span>
       </button>
     </nav>
 
     <div class="topbar-actions">
-      <button class="btn btn-outline" onclick="openIngestModal()">+ Extract Email</button>
-      <div class="btn btn-outline" style="cursor:default;pointer-events:none;" title="Configured via server .env file">
+      <button class="btn btn-sm btn-primary" onclick="openIngestModal()">+ Paste Email</button>
+      <div class="engine-pill" title="Configured via server environment">
         <span class="status-dot" id="gemini-dot"></span>
-        <span id="gemini-status-label">Engine Status</span>
+        <span id="gemini-status-label">Gemini 3.8 Flash</span>
       </div>
     </div>
   </header>
 
-  <!-- Executive KPI Ribbon -->
-  <section class="kpi-ribbon" id="kpi-ribbon">
-    <div class="kpi-card">
-      <div class="kpi-label">Analyzed Emails</div>
-      <div class="kpi-value" id="kpi-emails">0</div>
-      <div class="kpi-sub" id="kpi-threads">Across 0 threads</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Extracted Entities</div>
-      <div class="kpi-value" id="kpi-entities">0</div>
-      <div class="kpi-sub" id="kpi-entities-breakdown">People, Orgs, Locations</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Identified Topics</div>
-      <div class="kpi-value" id="kpi-topics">0</div>
-      <div class="kpi-sub">Multi-domain taxonomy</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Scheduled Deliverables</div>
-      <div class="kpi-value" id="kpi-tasks">0</div>
-      <div class="kpi-sub" id="kpi-critical">0 Critical priority</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Org Graph Network</div>
-      <div class="kpi-value" id="kpi-graph">0</div>
-      <div class="kpi-sub" id="kpi-edges">0 relational edges</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Schedule Conflicts</div>
-      <div class="kpi-value kpi-warn" id="kpi-conflicts">0</div>
-      <div class="kpi-sub">Overlapping high-priority windows</div>
-    </div>
+  <!-- Slim 1-Line Workspace Summary Strip -->
+  <section class="summary-strip" id="kpi-ribbon">
+    <span><strong id="kpi-emails">0</strong> emails (<span id="kpi-threads">0 threads</span>)</span>
+    <span class="strip-sep">&bull;</span>
+    <span><strong id="kpi-tasks">0</strong> tasks (<span id="kpi-critical">0 Critical</span>)</span>
+    <span class="strip-sep">&bull;</span>
+    <span><strong id="kpi-entities">0</strong> entities &amp; <strong id="kpi-graph">0</strong></span>
+    <span class="strip-sep">&bull;</span>
+    <button type="button" class="strip-conflict-btn" onclick="switchTab('tasks')">
+      &#9888; <strong id="kpi-conflicts">0</strong> schedule conflicts
+    </button>
   </section>
 
   <!-- Main Workspace Container -->
   <main class="workspace">
-    <!-- TAB 1: EMAIL EXTRACTION STUDIO -->
+    <!-- TAB 1: INBOX -->
     <section id="tab-emails" class="tab-panel active">
       <div class="split-layout">
         <!-- Left Email List -->
         <aside class="email-sidebar">
           <div class="panel-header">
             <div>
-              <h3>Corporate Inbox Stream</h3>
-              <p class="muted-sm">Select an email to inspect AI-extracted intelligence</p>
+              <h3>Inbox</h3>
             </div>
             <div class="header-btn-group">
-              <label class="btn btn-xs btn-secondary" for="eml-file-input" title="Upload .eml file">
+              <label class="btn btn-xs btn-outline" for="eml-file-input" title="Upload .eml file">
                 Upload .eml
               </label>
               <input type="file" id="eml-file-input" accept=".eml,.txt" style="display:none" onchange="handleEmlUpload(event)" />
-              <button class="btn btn-xs btn-primary" onclick="openIngestModal()">+ New</button>
+              <button class="btn btn-xs btn-secondary" onclick="openIngestModal()">+ Paste</button>
             </div>
           </div>
           <div class="search-box">
-            <input type="text" id="email-search" placeholder="Filter by subject, sender, topic, entity..." oninput="renderEmailList()" />
+            <input type="text" id="email-search" placeholder="Search emails..." oninput="renderEmailList()" />
           </div>
           <div class="email-list" id="email-list-container"></div>
         </aside>
@@ -198,13 +176,13 @@
       </div>
     </section>
 
-    <!-- TAB 3: PRODUCTIVITY & SCHEDULE HUB -->
+    <!-- TAB 3: TASKS & SCHEDULE -->
     <section id="tab-tasks" class="tab-panel">
       <div class="tasks-toolbar">
         <div class="view-switcher">
-          <button class="btn btn-sm active" id="view-btn-table" onclick="switchTaskView('table')">Structured Schedule Table</button>
-          <button class="btn btn-sm" id="view-btn-kanban" onclick="switchTaskView('kanban')">Kanban Workflow Board</button>
-          <button class="btn btn-sm" id="view-btn-gantt" onclick="switchTaskView('gantt')">Gantt Timeline &amp; Workload</button>
+          <button class="btn btn-sm active" id="view-btn-table" onclick="switchTaskView('table')">List</button>
+          <button class="btn btn-sm" id="view-btn-kanban" onclick="switchTaskView('kanban')">Board</button>
+          <button class="btn btn-sm" id="view-btn-gantt" onclick="switchTaskView('gantt')">Timeline</button>
         </div>
 
         <div class="task-filters">
@@ -213,10 +191,10 @@
           </select>
           <select id="filter-priority" onchange="renderTasksHub()">
             <option value="">All Priorities</option>
-            <option value="Critical">Critical Priority</option>
-            <option value="High">High Priority</option>
-            <option value="Medium">Medium Priority</option>
-            <option value="Low">Low Priority</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
           </select>
           <select id="filter-status" onchange="renderTasksHub()">
             <option value="">All Statuses</option>
@@ -228,10 +206,9 @@
         </div>
 
         <div class="export-actions">
-          <button class="btn btn-sm btn-primary" onclick="openNewTaskModal()">+ Add Task</button>
-          <a class="btn btn-sm btn-outline" href="/api/schedule/export/ics" download="email-intelligence-schedule.ics">Export iCal (.ics)</a>
-          <a class="btn btn-sm btn-outline" href="/api/schedule/export/csv" download="email-intelligence-tasks.csv">Export CSV</a>
-          <a class="btn btn-sm btn-outline" href="/api/schedule/export/md" download="email-intelligence-schedule.md">Export Markdown</a>
+          <button class="btn btn-sm btn-primary" onclick="openNewTaskModal()">+ Task</button>
+          <a class="btn btn-sm btn-outline" href="/api/schedule/export/ics" download="nexus-schedule.ics">Export .ics</a>
+          <a class="btn btn-sm btn-outline" href="/api/schedule/export/csv" download="nexus-tasks.csv">.csv</a>
         </div>
       </div>
 
@@ -279,51 +256,29 @@
       </div>
     </section>
 
-    <!-- TAB 4: AI INTELLIGENCE AGENT -->
+    <!-- TAB 4: AI ASSISTANT -->
     <section id="tab-agent" class="tab-panel">
       <div class="agent-layout">
         <aside class="agent-sidebar">
           <div class="card-section">
-            <h3>Autonomous Intelligence Agent</h3>
-            <p class="muted-sm">
-              Equipped with live tools to extract unstructured emails, query the NetworkX organizational graph, detect schedule conflicts, and automate task workflows.
-            </p>
-            <div class="agent-tools-list">
-              <div class="tool-chip"><code>extract_email_intelligence</code></div>
-              <div class="tool-chip"><code>query_organizational_graph</code></div>
-              <div class="tool-chip"><code>list_and_filter_tasks</code></div>
-              <div class="tool-chip"><code>create_or_update_task</code></div>
-              <div class="tool-chip"><code>draft_follow_up_email</code></div>
-              <div class="tool-chip"><code>export_schedule_to_tool</code></div>
-            </div>
-          </div>
-
-          <div class="card-section">
-            <h4>One-Click Agent Playbooks</h4>
+            <h4>Suggested Prompts</h4>
+            <p class="muted-sm" style="margin-bottom:10px;">Click to run a live multi-tool workflow:</p>
             <div class="playbook-buttons">
               <button class="playbook-btn" onclick="sendAgentPrompt('Check who has overlapping schedule conflicts on Critical tasks and draft a follow-up email to resolve the bottleneck')">
-                <strong>&#9993; Draft Conflict Follow-Up Email (HITL)</strong>
-                <span>Stage an outbound follow-up email with Human-in-the-Loop Approve &amp; Send</span>
+                <strong>&#9993; Draft Follow-Up on Conflicts</strong>
+                <span>Detect overlapping tasks &amp; stage an email for approval</span>
               </button>
               <button class="playbook-btn" onclick="sendAgentPrompt('Who are the top organizational influencers and cross-team bridges in the graph?')">
-                <strong>Organizational Graph Analysis</strong>
-                <span>Identify key influencers, PageRank scores, and cross-team bridges</span>
+                <strong>Find Key Influencers &amp; Bottlenecks</strong>
+                <span>Run PageRank &amp; Betweenness Centrality on the graph</span>
               </button>
               <button class="playbook-btn" onclick="sendAgentPrompt('Show all Critical priority deliverables and detect schedule conflicts across owners')">
-                <strong>Critical Schedule &amp; Conflict Audit</strong>
-                <span>List critical deliverables and flag overlapping high-priority windows</span>
-              </button>
-              <button class="playbook-btn" onclick="sendAgentPrompt('Show Liam O\'Connor\'s deliverable schedule and workload utilization')">
-                <strong>Owner Deep-Dive: Liam O'Connor</strong>
-                <span>Inspect SRE deliverables, security tasks, and timeline overlaps</span>
-              </button>
-              <button class="playbook-btn" onclick="sendAgentPrompt('Show Marcus Vance\'s tasks, role, and communication centrality')">
-                <strong>Owner Deep-Dive: Marcus Vance</strong>
-                <span>Inspect Principal Architect deliverables and graph centrality</span>
+                <strong>Audit Critical Deadlines</strong>
+                <span>List critical tasks &amp; flag overloaded owners</span>
               </button>
               <button class="playbook-btn" onclick="sendAgentPrompt('Extract from this new email: Subject: Q4 Customer Advisory Board in Chicago. Hi Jordan Taylor and Sarah Chen, please finalize the executive slide deck starting 2026-11-05 and deliver it by 2026-11-14 (High Priority). Also Claire Dupont will confirm keynote panelists by 2026-11-11.')">
-                <strong>Live Agent Email Extraction Test</strong>
-                <span>Extract entities, topics &amp; tasks from raw text and add to schedule</span>
+                <strong>Extract Tasks from a New Email</strong>
+                <span>Parse raw text into entities, quotes &amp; schedule items</span>
               </button>
             </div>
           </div>
@@ -333,13 +288,11 @@
           <div class="chat-messages" id="chat-messages">
             <div class="chat-msg agent">
               <div class="msg-header">
-                <strong>NexusAI Intelligence Agent</strong>
-                <span class="badge badge-indigo">Tool-Augmented Agent Ready</span>
+                <strong>NexusAI Assistant</strong>
+                <span class="badge badge-indigo">Ready</span>
               </div>
               <div class="msg-body">
-                Hello! I am connected to your live <strong>Email Extraction Pipeline</strong>, <strong>Organizational &amp; Temporal Graph Engine</strong>, and <strong>Productivity Task Scheduler</strong>.
-                <br/><br/>
-                Ask me to analyze organizational bottlenecks, inspect any team member's deliverables, update task statuses (e.g., <code>mark tsk-001-01 as completed</code>), or paste a raw email to extract and schedule its tasks automatically.
+                Ask me about deadlines, schedule conflicts, or team bottlenecks — or ask me to <strong>draft a follow-up email</strong> or <strong>update a task</strong> (e.g., <code>mark tsk-001-01 as completed</code>).
               </div>
             </div>
           </div>
@@ -454,7 +407,7 @@ Sarah Chen</textarea>
     </div>
   </div>
 
-  <script src="/static/app.js?v=9.0"></script>
+  <script src="/static/app.js?v=10.0"></script>
 </body>
 </html>
 

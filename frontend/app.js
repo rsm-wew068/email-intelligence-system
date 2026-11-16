@@ -87,33 +87,38 @@ function renderKpiRibbon() {
   if (!ov) return;
   const m = ov.metrics;
 
-  document.getElementById("badge-emails").textContent = m.total_emails;
-  document.getElementById("badge-nodes").textContent = m.graph_nodes;
-  document.getElementById("badge-tasks").textContent = m.total_tasks;
+  const setTxt = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
 
-  document.getElementById("kpi-emails").textContent = m.total_emails;
-  document.getElementById("kpi-threads").textContent = `Across ${m.total_threads} threads`;
+  setTxt("badge-emails", m.total_emails);
+  setTxt("badge-nodes", m.graph_nodes);
+  setTxt("badge-tasks", m.total_tasks);
+
+  setTxt("kpi-emails", m.total_emails);
+  setTxt("kpi-threads", `${m.total_threads} threads`);
 
   const totalEntities = m.total_people + m.total_organizations + m.total_locations;
-  document.getElementById("kpi-entities").textContent = totalEntities;
-  document.getElementById("kpi-entities-breakdown").textContent = `${m.total_people} People • ${m.total_organizations} Orgs • ${m.total_locations} Locations`;
+  setTxt("kpi-entities", totalEntities);
+  setTxt("kpi-entities-breakdown", `${m.total_people} People • ${m.total_organizations} Orgs • ${m.total_locations} Locations`);
 
-  document.getElementById("kpi-topics").textContent = m.total_topics;
-  document.getElementById("kpi-tasks").textContent = m.total_tasks;
-  document.getElementById("kpi-critical").textContent = `${m.critical_tasks} Critical priority deliverables`;
-  document.getElementById("kpi-graph").textContent = `${m.graph_nodes} Nodes`;
-  document.getElementById("kpi-edges").textContent = `${m.graph_edges} relational & temporal edges`;
-  document.getElementById("kpi-conflicts").textContent = m.schedule_conflicts;
+  setTxt("kpi-topics", m.total_topics);
+  setTxt("kpi-tasks", m.total_tasks);
+  setTxt("kpi-critical", `${m.critical_tasks} Critical`);
+  setTxt("kpi-graph", `${m.graph_nodes} graph nodes`);
+  setTxt("kpi-edges", `${m.graph_edges} relational & temporal edges`);
+  setTxt("kpi-conflicts", m.schedule_conflicts);
 
   const dot = document.getElementById("gemini-dot");
   const label = document.getElementById("gemini-status-label");
   if (dot && label) {
     if (ov.gemini_configured) {
       dot.style.background = "#10b981";
-      label.textContent = "Engine: Gemini 3.8 Flash (.env)";
+      label.textContent = "Gemini 3.8 Flash";
     } else {
       dot.style.background = "#6366f1";
-      label.textContent = "Engine: Local Hybrid NLP";
+      label.textContent = "Hybrid NLP";
     }
   }
 }
@@ -136,20 +141,19 @@ function renderEmailList() {
       const urgency = (ext.summary && ext.summary.urgency_score) || 5;
       const urgBadge =
         urgency >= 8
-          ? `<span class="badge badge-rose">Urgency ${urgency}/10</span>`
-          : `<span class="badge badge-indigo">${topTopic}</span>`;
+          ? `<span class="badge badge-rose">Urgent</span>`
+          : `<span class="badge badge-indigo">${escapeHtml(topTopic)}</span>`;
 
       return `
         <div class="email-item ${em.id === appState.selectedEmailId ? "active" : ""}" onclick="selectEmail('${em.id}')">
           <div class="email-item-top">
             <span class="email-sender">${escapeHtml(em.sender_name)}</span>
-            <span class="email-date">${em.timestamp.slice(0, 10)}</span>
+            <span class="email-date">${em.timestamp.slice(5, 10)}</span>
           </div>
           <div class="email-subject">${escapeHtml(em.subject)}</div>
           <div class="email-tags">
             ${urgBadge}
-            <span class="badge badge-emerald">${taskCount} Task${taskCount === 1 ? "" : "s"}</span>
-            <span class="badge badge-cyan">${(ext.entities?.people || []).length} People</span>
+            ${taskCount > 0 ? `<span class="badge badge-emerald">${taskCount} task${taskCount === 1 ? "" : "s"}</span>` : `<span class="muted-sm">FYI</span>`}
           </div>
         </div>
       `;
@@ -234,19 +238,17 @@ function renderSelectedEmailInspector() {
       return `
         <div class="task-mini-card">
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:13px;color:#fff;">
-              <code>${t.id}</code> — ${escapeHtml(t.deliverable)}
+            <div style="font-weight:600;font-size:13.5px;color:#fff;">
+              ${escapeHtml(t.deliverable)}
             </div>
             <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">
-              <strong>Owner:</strong> ${escapeHtml(t.owner)} &bull;
-              <strong>Start:</strong> ${t.start_date} &bull;
-              <strong>Due:</strong> ${t.due_date}
+              <strong>${escapeHtml(t.owner)}</strong> &bull; Due <strong>${t.due_date}</strong>
             </div>
             ${quoteHtml}
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
             <span class="badge ${pBadge}">${t.priority}</span>
-            <span class="badge badge-emerald">${t.status}</span>
+            <button class="btn btn-xs btn-outline" onclick="draftFollowUpForTask('${t.id}')">&#9993; Follow Up</button>
           </div>
         </div>
       `;
@@ -264,85 +266,97 @@ function renderSelectedEmailInspector() {
     )
     .join("");
 
+  const entityCount =
+    (ext.entities.people || []).length +
+    (ext.entities.organizations || []).length +
+    (ext.entities.locations || []).length;
+  const topicPillSummary = (ext.topics || [])
+    .slice(0, 2)
+    .map((t) => `<span class="badge badge-indigo">${escapeHtml(t.category)}</span>`)
+    .join(" ");
+
   container.innerHTML = `
     <div class="inspector-header">
       <div class="inspector-title-row">
         <h2>${escapeHtml(em.subject)}</h2>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span class="badge badge-amber">Sentiment: ${ext.summary.sentiment} (Urgency ${ext.summary.urgency_score}/10)</span>
-          <span class="badge badge-indigo">Engine: ${escapeHtml(ext.extraction_engine)}</span>
-          <button class="btn btn-xs btn-primary" onclick="reExtractCurrentEmail('${em.id}')">&#10024; Re-Extract with Gemini</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+          ${topicPillSummary}
+          <span class="badge ${ext.summary.urgency_score >= 8 ? "badge-rose" : "badge-amber"}">Urgency ${ext.summary.urgency_score}/10</span>
+          <button class="btn btn-xs btn-outline" onclick="reExtractCurrentEmail('${em.id}')" title="Re-run live Gemini extraction">&#8635; Re-extract</button>
         </div>
       </div>
       <div class="meta-grid">
         <div><strong>From:</strong> ${escapeHtml(em.sender_name)} &lt;${escapeHtml(em.sender_email)}&gt;</div>
-        <div><strong>Timestamp:</strong> ${em.timestamp}</div>
-        <div><strong>Recipients:</strong> ${recStr}</div>
+        <div><strong>Date:</strong> ${em.timestamp.slice(0, 10)}</div>
+        <div><strong>To:</strong> ${recStr}</div>
       </div>
     </div>
 
-    <div class="extraction-grid">
-      <!-- Executive Summary & Key Points -->
-      <div class="ext-box">
-        <h4>
-          <span>1d. AI Executive Summary &amp; Decisions</span>
-          <span class="badge badge-emerald">Synthesized</span>
-        </h4>
-        <p class="summary-text">${escapeHtml(ext.summary.executive_summary)}</p>
-        <div class="entity-group-label">Key Extracted Points:</div>
-        <ul class="bullet-list">
-          ${(ext.summary.key_points || []).map((kp) => `<li>${escapeHtml(kp)}</li>`).join("")}
-        </ul>
-      </div>
-
-      <!-- Topics & Timeline -->
-      <div class="ext-box">
-        <h4>
-          <span>1a. Extracted Topics &amp; Domain Taxonomy</span>
-          <span class="badge badge-indigo">${(ext.topics || []).length} Topics</span>
-        </h4>
-        ${topicsHtml}
-        <h4 style="margin-top:14px;">
-          <span>Chronological Timeline Milestones</span>
-        </h4>
-        ${timelineHtml || '<div class="muted-sm">No explicit timeline milestones.</div>'}
-      </div>
-    </div>
-
-    <!-- Entities Box -->
+    <!-- 1. Clean TL;DR Summary -->
     <div class="ext-box">
       <h4>
-        <span>1b. Extracted Entities (People, Organizations, Locations)</span>
-        <span class="badge badge-cyan">Disambiguated</span>
+        <span>TL;DR Summary</span>
       </h4>
-      <div class="entity-group">
-        <div class="entity-group-label">People (${(ext.entities.people || []).length})</div>
-        <div class="chip-row">${peopleHtml}</div>
-      </div>
-      <div class="entity-group">
-        <div class="entity-group-label">Organizations &amp; Teams (${(ext.entities.organizations || []).length})</div>
-        <div class="chip-row">${orgsHtml}</div>
-      </div>
-      <div class="entity-group" style="margin-bottom:0;">
-        <div class="entity-group-label">Locations &amp; Regions (${(ext.entities.locations || []).length})</div>
-        <div class="chip-row">${locsHtml || '<span class="muted-sm">None mentioned</span>'}</div>
-      </div>
+      <p class="summary-text">${escapeHtml(ext.summary.executive_summary)}</p>
+      ${
+        (ext.summary.key_points || []).length > 0
+          ? `<ul class="bullet-list" style="margin-top:8px;">${(ext.summary.key_points || [])
+              .slice(0, 3)
+              .map((kp) => `<li>${escapeHtml(kp)}</li>`)
+              .join("")}</ul>`
+          : ""
+      }
     </div>
 
-    <!-- Extracted Tasks & Associated Timelines -->
+    <!-- 2. Action Items (Primary Focus) -->
     <div class="ext-box">
       <h4>
-        <span>1c. Extracted Tasks, Deliverables &amp; Associated Timelines</span>
-        <button class="btn btn-xs btn-primary" onclick="switchTab('tasks')">Open in Productivity Schedule Hub &rarr;</button>
+        <span>Action Items (${(ext.tasks || []).length})</span>
+        <button class="btn btn-xs btn-secondary" onclick="switchTab('tasks')">Open Task Board &rarr;</button>
       </h4>
-      ${tasksHtml || '<div class="muted-sm">No actionable tasks extracted from this email.</div>'}
+      ${tasksHtml || '<div class="muted-sm">No action items required in this email.</div>'}
     </div>
 
-    <!-- Raw Email Body -->
-    <div class="ext-box">
-      <h4><span>Source Unstructured Email Body</span></h4>
-      <div class="raw-email-box">${escapeHtml(em.body)}</div>
-    </div>
+    <!-- 3. Collapsible Extracted Entities & Topics Drawer -->
+    <details class="clean-drawer">
+      <summary>
+        <span>Extracted Entities &amp; Topics (${entityCount} entities &bull; ${(ext.topics || []).length} topics)</span>
+        <span class="muted-sm">Click to expand</span>
+      </summary>
+      <div class="drawer-body">
+        <div class="entity-group">
+          <div class="entity-group-label">People (${(ext.entities.people || []).length})</div>
+          <div class="chip-row">${peopleHtml}</div>
+        </div>
+        <div class="entity-group">
+          <div class="entity-group-label">Organizations (${(ext.entities.organizations || []).length})</div>
+          <div class="chip-row">${orgsHtml}</div>
+        </div>
+        <div class="entity-group">
+          <div class="entity-group-label">Locations (${(ext.entities.locations || []).length})</div>
+          <div class="chip-row">${locsHtml || '<span class="muted-sm">None</span>'}</div>
+        </div>
+        ${
+          timelineHtml
+            ? `<div class="entity-group" style="margin-top:10px;margin-bottom:0;">
+                <div class="entity-group-label">Key Dates &amp; Milestones</div>
+                ${timelineHtml}
+              </div>`
+            : ""
+        }
+      </div>
+    </details>
+
+    <!-- 4. Original Email Message -->
+    <details class="clean-drawer" open>
+      <summary>
+        <span>Original Email</span>
+        <span class="muted-sm">${escapeHtml(em.sender_email)}</span>
+      </summary>
+      <div class="drawer-body">
+        <div class="raw-email-box">${escapeHtml(em.body)}</div>
+      </div>
+    </details>
   `;
 }
 
