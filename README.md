@@ -2,7 +2,17 @@
 
 **Live Demo (Google Cloud Run):** [https://email-intelligence-system-249816165253.us-central1.run.app](https://email-intelligence-system-249816165253.us-central1.run.app)
 
-An end-to-end full-stack AI system that extracts structured intelligence from unstructured corporate emails, constructs an **Organizational, Relational, and Temporal Knowledge Graph**, automates deliverable scheduling & conflict detection, and provides an autonomous **Multi-Tool AI Agent**.
+An end-to-end full-stack AI system that extracts structured intelligence from unstructured corporate emails, constructs an **Organizational, Relational, and Temporal Knowledge Graph**, automates deliverable scheduling & Human-in-the-Loop conflict resolution, and provides a governed **Multi-Tool AI Agent**.
+
+---
+
+## Workflow & System Architecture
+
+### 1. End-to-End Functional Workflow
+![End-to-End Functional Workflow](docs/workflow_diagram.svg)
+
+### 2. Unified System Architecture
+![Unified System Architecture](docs/architecture_diagram.svg)
 
 ---
 
@@ -25,18 +35,20 @@ An end-to-end full-stack AI system that extracts structured intelligence from un
    - Computes **PageRank** (organizational influence), **Betweenness Centrality** (cross-team bridges/bottlenecks), and **Greedy Modularity Communities** (working clusters).
    - Interactive Retina HiDPI HTML5 Canvas force-directed layout with a **Temporal Evolution Slider** to inspect network snapshots across dates.
 
-4. **Automated Productivity & Schedule Hub (`backend/productivity.py`)**
+4. **Human-in-the-Loop Productivity & Schedule Hub (`backend/productivity.py`)**
    - Converts extracted tasks into a **Structured Deliverable Table**, **Interactive Kanban Board**, and **Gantt Timeline & Workload Chart**.
-   - Automatically detects **Schedule Conflicts** (overlapping high/critical priority windows per owner).
+   - **Semantic Duplicate Review Queue**: Holds near-duplicate thread follow-ups for explicit human sign-off (`Approve Merge`, `Keep Separate`, or `Discard`) rather than silently mutating or duplicating tasks.
+   - **Schedule Conflict Resolution Proposals**: Detects overlapping Critical/High windows per owner and proposes 1-click human-approved **Date Shifts** or **Lightest-Owner Reassignments**.
    - **One-Click Exports**: Download schedules as **iCalendar (`.ics`)**, **CSV**, or **Markdown**.
 
-5. **Autonomous Multi-Tool ReAct Agent (`backend/agent.py`)**
+5. **Governed Multi-Tool AI Agent (`backend/agent.py`)**
    - Native function-calling agent with visible tool execution traces:
      - `extract_email_intelligence`
      - `query_organizational_graph`
      - `list_and_filter_tasks`
      - `create_or_update_task`
      - `export_schedule_to_tool`
+     - `draft_follow_up_email` *(stages editable Human-in-the-Loop outbound email approval cards)*
 
 ---
 
